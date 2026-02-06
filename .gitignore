@@ -1,0 +1,45 @@
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ---- Secrets ----
+.env
+*.env
+.env.*
+backend/.env
+frontend/.env
+
+# ---- Python / Django ----
+backend/venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.log
+*.pot
+*.mo
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django static/media (keep if you generate locally)
+backend/staticfiles/
+backend/media/
+
+# ---- Node / React ----
+frontend/node_modules/
+node_modules/
+frontend/dist/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
