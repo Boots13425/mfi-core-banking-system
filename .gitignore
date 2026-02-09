@@ -29,6 +29,7 @@ pip-wheel-metadata/
 .pytest_cache/
 .coverage
 htmlcov/
+python-version
 
 # Django static/media (keep if you generate locally)
 backend/staticfiles/
@@ -43,3 +44,4 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+

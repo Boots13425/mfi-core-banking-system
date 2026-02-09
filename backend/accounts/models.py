@@ -68,6 +68,8 @@ class AuditLog(models.Model):
         ('USER_ROLE_CHANGED', 'User Role Changed'),
         ('USER_BRANCH_CHANGED', 'User Branch Changed'),
         ('PASSWORD_SET_VIA_INVITE', 'Password Set Via Invite'),
+        ('CLIENT_CREATED', 'Client Created'),
+        ('CLIENT_STATUS_CHANGED', 'Client Status Changed'),
     ]
     
     actor = models.ForeignKey(
