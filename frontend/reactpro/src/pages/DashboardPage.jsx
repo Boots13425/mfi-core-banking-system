@@ -19,22 +19,57 @@ export const DashboardPage = () => {
         <p>Role: <strong>{user?.role}</strong></p>
       </div>
 
-      {user?.role === 'SUPER_ADMIN' && (
-        <button
-          onClick={() => navigate('/super-admin')}
-          style={{
-            padding: '10px 20px',
-            marginRight: '10px',
-            backgroundColor: '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Go to Super Admin Panel
-        </button>
-      )}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {user?.role === 'SUPER_ADMIN' && (
+          <button
+            onClick={() => navigate('/super-admin')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Go to Super Admin Panel
+          </button>
+        )}
+
+        {(user?.role === 'LOAN_OFFICER' || user?.role === 'BRANCH_MANAGER') && (
+          <>
+            <button
+              onClick={() => navigate('/clients')}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              View Clients
+            </button>
+
+            {user?.role === 'LOAN_OFFICER' && (
+              <button
+                onClick={() => navigate('/clients/new')}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Register New Client
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
       <button
         onClick={handleLogout}

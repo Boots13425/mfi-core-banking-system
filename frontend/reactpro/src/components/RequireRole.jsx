@@ -1,10 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 
-export const RequireRole = ({ children, role }) => {
+export const RequireRole = ({ children, role, roles }) => {
   const { user } = useAuth();
 
-  if (!user || user.role !== role) {
+  // Allow passing either a single role or an array of roles
+  const allowedRoles = roles || (role ? [role] : []);
+  
+  if (!user || !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
