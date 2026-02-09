@@ -221,6 +221,16 @@ export const ClientListPage = () => {
               >
                 Status
               </th>
+              <th
+                style={{
+                  padding: '15px',
+                  textAlign: 'left',
+                  fontWeight: 'bold',
+                  borderRight: '1px solid #ddd',
+                }}
+              >
+                KYC Status
+              </th>
               <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>
                 Actions
               </th>
@@ -279,6 +289,58 @@ export const ClientListPage = () => {
                   >
                     {client.status}
                   </span>
+                </td>
+                <td
+                  style={{
+                    padding: '12px 15px',
+                    borderRight: '1px solid #ddd',
+                  }}
+                >
+                  {client.kyc_status ? (
+                    <span
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background:
+                          client.kyc_status === 'APPROVED'
+                            ? '#d4edda'
+                            : client.kyc_status === 'REJECTED'
+                            ? '#f8d7da'
+                            : client.kyc_status === 'SUBMITTED'
+                            ? '#fff3cd'
+                            : '#d1ecf1',
+                        color:
+                          client.kyc_status === 'APPROVED'
+                            ? '#155724'
+                            : client.kyc_status === 'REJECTED'
+                            ? '#721c24'
+                            : client.kyc_status === 'SUBMITTED'
+                            ? '#856404'
+                            : '#0c5460',
+                      }}
+                    >
+                      {client.kyc_status === 'APPROVED'
+                        ? 'Approved'
+                        : client.kyc_status === 'REJECTED'
+                        ? 'Rejected'
+                        : client.kyc_status === 'SUBMITTED'
+                        ? 'Submitted'
+                        : 'Pending'}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: '#666',
+                      }}
+                    >
+                      Not Started
+                    </span>
+                  )}
                 </td>
                 <td style={{ padding: '12px 15px' }}>
                   <button

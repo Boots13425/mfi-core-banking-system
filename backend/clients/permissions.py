@@ -17,5 +17,16 @@ class IsCashierOrBranchManagerReadOnly(BasePermission):
             return user.role in ('CASHIER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'AUDITOR')
 
         # Non-safe methods (create, update, partial_update)
-        # Only Cashier is allowed to create; only Cashier may change status
-        return user.role == 'CASHIER'
+        # Only Cashier is allowed to create and perform most write actions
+        if user.role == 'CASHIER':
+            return True
+
+        # Allow Branch Manager to perform specific non-safe actions such as
+        # approving/rejecting KYC and deactivating a client. These actions are
+        # implemented as viewset actions named 'approve_kyc', 'reject_kyc',
+        # and 'deactivate'. For other write actions, Branch Manager is not allowed.
+        action = getattr(view, 'action', None)
+        if user.role == 'BRANCH_MANAGER' and action in ('approve_kyc', 'reject_kyc', 'deactivate'):
+            return True
+
+        return False

@@ -70,6 +70,11 @@ class AuditLog(models.Model):
         ('PASSWORD_SET_VIA_INVITE', 'Password Set Via Invite'),
         ('CLIENT_CREATED', 'Client Created'),
         ('CLIENT_STATUS_CHANGED', 'Client Status Changed'),
+        ('KYC_INITIATED', 'KYC Initiated'),
+        ('KYC_DOCUMENT_UPLOADED', 'KYC Document Uploaded'),
+        ('KYC_APPROVED', 'KYC Approved'),
+        ('KYC_REJECTED', 'KYC Rejected'),
+        ('CLIENT_DEACTIVATED', 'Client Deactivated'),
     ]
     
     actor = models.ForeignKey(
