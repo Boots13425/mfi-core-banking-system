@@ -53,9 +53,27 @@ export const ClientListPage = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '20px',
+          gap: '12px',
         }}
       >
-        <h1>Clients</h1>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <h1 style={{ margin: 0 }}>Clients</h1>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{
+              padding: '8px 14px',
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            ← Dashboard
+          </button>
+        </div>
+
         {user?.role === 'LOAN_OFFICER' && (
           <button
             onClick={() => navigate('/clients/new')}

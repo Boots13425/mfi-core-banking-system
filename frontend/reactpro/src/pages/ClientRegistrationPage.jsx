@@ -267,7 +267,7 @@ export const ClientRegistrationPage = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/clients')}
+            onClick={() => navigate('/dashboard')}
             disabled={loading}
             style={{
               padding: '10px 20px',
