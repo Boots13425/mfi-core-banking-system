@@ -170,7 +170,7 @@ const AppRoutes = () => {
         path="/clients"
         element={
           <RequireAuth>
-            <RequireRole roles={['LOAN_OFFICER', 'BRANCH_MANAGER']}>
+            <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
               <ClientListPage />
             </RequireRole>
           </RequireAuth>
@@ -181,7 +181,7 @@ const AppRoutes = () => {
         path="/clients/new"
         element={
           <RequireAuth>
-            <RequireRole role="LOAN_OFFICER">
+            <RequireRole role="CASHIER">
               <ClientRegistrationPage />
             </RequireRole>
           </RequireAuth>
@@ -192,7 +192,7 @@ const AppRoutes = () => {
         path="/clients/:id"
         element={
           <RequireAuth>
-            <RequireRole roles={['LOAN_OFFICER', 'BRANCH_MANAGER']}>
+            <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
               <ClientProfilePage />
             </RequireRole>
           </RequireAuth>

@@ -4,14 +4,14 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from .models import Client
 from .serializers import ClientSerializer
-from .permissions import IsLoanOfficerOrBranchManagerReadOnly
+from .permissions import IsCashierOrBranchManagerReadOnly
 from accounts.models import AuditLog
 
 
 class ClientViewSet(viewsets.ModelViewSet):
     serializer_class = ClientSerializer
     queryset = Client.objects.all()
-    permission_classes = (IsLoanOfficerOrBranchManagerReadOnly,)
+    permission_classes = (IsCashierOrBranchManagerReadOnly,)
 
     def get_queryset(self):
         qs = super().get_queryset()

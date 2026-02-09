@@ -74,7 +74,7 @@ export const ClientListPage = () => {
           </button>
         </div>
 
-        {user?.role === 'LOAN_OFFICER' && (
+        {user?.role === 'CASHIER' && (
           <button
             onClick={() => navigate('/clients/new')}
             style={{

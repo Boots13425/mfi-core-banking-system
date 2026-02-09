@@ -250,7 +250,7 @@ export const ClientProfilePage = () => {
           </div>
         </div>
 
-        {user?.role === 'LOAN_OFFICER' && client.status === 'ACTIVE' && (
+        {user?.role === 'CASHIER' && client.status === 'ACTIVE' && (
           <div style={{ borderTop: '2px solid #f0f0f0', paddingTop: '20px' }}>
             <button
               onClick={handleDeactivate}

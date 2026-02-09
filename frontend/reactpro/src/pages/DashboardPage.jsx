@@ -36,7 +36,7 @@ export const DashboardPage = () => {
           </button>
         )}
 
-        {(user?.role === 'LOAN_OFFICER' || user?.role === 'BRANCH_MANAGER') && (
+        {(user?.role === 'CASHIER' || user?.role === 'BRANCH_MANAGER') && (
           <>
             <button
               onClick={() => navigate('/clients')}
@@ -52,7 +52,7 @@ export const DashboardPage = () => {
               View Clients
             </button>
 
-            {user?.role === 'LOAN_OFFICER' && (
+            {user?.role === 'CASHIER' && (
               <button
                 onClick={() => navigate('/clients/new')}
                 style={{
