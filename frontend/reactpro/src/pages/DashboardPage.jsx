@@ -69,6 +69,22 @@ export const DashboardPage = () => {
             )}
           </>
         )}
+
+        {user?.role === 'LOAN_OFFICER' && (
+          <button
+            onClick={() => navigate('/loan-officer/clients')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Loan Management
+          </button>
+        )}
       </div>
 
       <button

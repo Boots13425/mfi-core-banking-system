@@ -75,6 +75,9 @@ class AuditLog(models.Model):
         ('KYC_APPROVED', 'KYC Approved'),
         ('KYC_REJECTED', 'KYC Rejected'),
         ('CLIENT_DEACTIVATED', 'Client Deactivated'),
+        ('LOAN_CREATED', 'Loan Created'),
+        ('REPAYMENT_RECORDED', 'Repayment Recorded'),
+        ('LOAN_CLOSED', 'Loan Closed'),
     ]
     
     actor = models.ForeignKey(
