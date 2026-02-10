@@ -13,6 +13,8 @@ import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { ClientListPage } from './pages/ClientListPage';
 import { ClientRegistrationPage } from './pages/ClientRegistrationPage';
 import { ClientProfilePage } from './pages/ClientProfilePage';
+import { LoanOfficerClientsPage } from './pages/LoanOfficerClientsPage';
+import { LoanOfficerClientLoanContextPage } from './pages/LoanOfficerClientLoanContextPage';
 import axiosInstance from './api/axios';
 
 const SuperAdminPanel = () => {
@@ -194,6 +196,28 @@ const AppRoutes = () => {
           <RequireAuth>
             <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
               <ClientProfilePage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/loan-officer/clients"
+        element={
+          <RequireAuth>
+            <RequireRole role="LOAN_OFFICER">
+              <LoanOfficerClientsPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/loan-officer/clients/:clientId"
+        element={
+          <RequireAuth>
+            <RequireRole role="LOAN_OFFICER">
+              <LoanOfficerClientLoanContextPage />
             </RequireRole>
           </RequireAuth>
         }
