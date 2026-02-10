@@ -878,6 +878,27 @@ export const ClientProfilePage = () => {
               </div>
             )}
 
+            {/* Savings Account Link (Cashier and Branch Manager) */}
+            {(user?.role === 'CASHIER' || user?.role === 'BRANCH_MANAGER') && (
+              <div style={{ paddingTop: '20px', borderTop: '2px solid #f0f0f0' }}>
+                <button
+                  onClick={() => navigate(`/clients/${id}/savings`)}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginRight: '10px',
+                  }}
+                >
+                  View Savings Account
+                </button>
+              </div>
+            )}
+
             {/* Deactivate Button (Cashier and Branch Manager after approval) */}
             {(user?.role === 'CASHIER' || user?.role === 'BRANCH_MANAGER') &&
               kyc.status === 'APPROVED' &&

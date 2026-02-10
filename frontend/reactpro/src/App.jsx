@@ -13,6 +13,9 @@ import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { ClientListPage } from './pages/ClientListPage';
 import { ClientRegistrationPage } from './pages/ClientRegistrationPage';
 import { ClientProfilePage } from './pages/ClientProfilePage';
+import { SavingsAccountPage } from './pages/SavingsAccountPage';
+import { DepositPage } from './pages/DepositPage';
+import { TransactionHistoryPage } from './pages/TransactionHistoryPage';
 import { LoanOfficerClientsPage } from './pages/LoanOfficerClientsPage';
 import { LoanOfficerClientLoanContextPage } from './pages/LoanOfficerClientLoanContextPage';
 import axiosInstance from './api/axios';
@@ -218,6 +221,39 @@ const AppRoutes = () => {
           <RequireAuth>
             <RequireRole role="LOAN_OFFICER">
               <LoanOfficerClientLoanContextPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/clients/:clientId/savings"
+        element={
+          <RequireAuth>
+            <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
+              <SavingsAccountPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/clients/:clientId/deposit"
+        element={
+          <RequireAuth>
+            <RequireRole role="CASHIER">
+              <DepositPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/clients/:clientId/transactions"
+        element={
+          <RequireAuth>
+            <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
+              <TransactionHistoryPage />
             </RequireRole>
           </RequireAuth>
         }
