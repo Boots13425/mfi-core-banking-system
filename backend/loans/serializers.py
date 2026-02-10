@@ -80,6 +80,9 @@ class LoanDetailSerializer(serializers.ModelSerializer):
     installments = LoanInstallmentSerializer(many=True, read_only=True)
     repayments = RepaymentSerializer(many=True, read_only=True)
     risk = serializers.SerializerMethodField()
+    total_amount_due = serializers.SerializerMethodField()
+    total_paid = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Loan
@@ -95,15 +98,37 @@ class LoanDetailSerializer(serializers.ModelSerializer):
             "status",
             "created_by",
             "created_at",
+            "total_amount_due",
+            "total_paid",
+            "outstanding_amount",
             "installments",
             "repayments",
             "risk",
         ]
-        read_only_fields = ["id", "created_by", "created_at", "installments", "repayments", "risk"]
+        read_only_fields = [
+            "id",
+            "created_by",
+            "created_at",
+            "total_amount_due",
+            "total_paid",
+            "outstanding_amount",
+            "installments",
+            "repayments",
+            "risk",
+        ]
 
     def get_risk(self, obj):
         r = refresh_overdue_flags_for_loan(obj)
         return {"label": r.label, "max_days_overdue": r.max_days_overdue}
+
+    def get_total_amount_due(self, obj):
+        return str(obj.total_amount_due)
+
+    def get_total_paid(self, obj):
+        return str(obj.total_paid)
+
+    def get_outstanding_amount(self, obj):
+        return str(obj.outstanding_amount)
 
 
 class RecordRepaymentSerializer(serializers.Serializer):

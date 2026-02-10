@@ -65,6 +65,16 @@ class Loan(models.Model):
     def total_amount_due(self) -> Decimal:
         return (self.principal_amount + self.total_interest_amount).quantize(Decimal("0.01"))
 
+    @property
+    def total_paid(self) -> Decimal:
+        agg = sum((inst.amount_paid for inst in self.installments.all()), Decimal("0.00"))
+        return agg.quantize(Decimal("0.01"))
+
+    @property
+    def outstanding_amount(self) -> Decimal:
+        out = (self.total_amount_due - self.total_paid).quantize(Decimal("0.01"))
+        return out if out > 0 else Decimal("0.00")
+
 
 class LoanInstallment(models.Model):
     class Status(models.TextChoices):

@@ -96,6 +96,9 @@ def loan_officer_client_loan_context(request, clientId: int):
             "disbursement_date": active_loan.disbursement_date,
             "first_due_date": active_loan.first_due_date,
             "status": active_loan.status,
+            "total_amount_due": str(active_loan.total_amount_due),
+            "total_paid": str(active_loan.total_paid),
+            "outstanding_amount": str(active_loan.outstanding_amount),
         }
 
     history_payload = []
@@ -110,6 +113,9 @@ def loan_officer_client_loan_context(request, clientId: int):
                 "interest_rate": str(l.interest_rate),
                 "number_of_installments": l.number_of_installments,
                 "repayment_frequency": l.repayment_frequency,
+                "total_amount_due": str(l.total_amount_due),
+                "total_paid": str(l.total_paid),
+                "outstanding_amount": str(l.outstanding_amount),
                 "created_at": l.created_at,
                 "created_by": getattr(l.created_by, "username", None),
                 "risk_label": rr.label if rr else "OK",
@@ -215,6 +221,9 @@ class LoanViewSet(viewsets.GenericViewSet):
         return Response(
             {
                 "loan_id": loan.id,
+                "total_amount_due": str(loan.total_amount_due),
+                "total_paid": str(loan.total_paid),
+                "outstanding_amount": str(loan.outstanding_amount),
                 "risk": {"label": risk.label, "max_days_overdue": risk.max_days_overdue},
                 "installments": LoanInstallmentSerializer(installments, many=True).data,
             }

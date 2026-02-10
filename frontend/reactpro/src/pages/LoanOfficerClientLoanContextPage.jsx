@@ -238,17 +238,32 @@ export const LoanOfficerClientLoanContextPage = () => {
       {/* Loan Overview */}
       <div style={{ marginTop: '16px', background: '#fff', border: '1px solid #ddd', borderRadius: '4px', padding: '20px' }}>
         <h2 style={{ marginTop: 0 }}>Loan Overview</h2>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ color: '#666' }}>Loan status:</div>
-          <Badge
-            text={context.computed_state}
-            bg={context.computed_state === 'Overdue' ? '#fff3cd' : context.computed_state === 'Active Loan' ? '#d1ecf1' : '#e2e3e5'}
-            color={context.computed_state === 'Overdue' ? '#856404' : context.computed_state === 'Active Loan' ? '#0c5460' : '#383d41'}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ color: '#666' }}>Loan status:</div>
+            <Badge
+              text={context.computed_state}
+              bg={context.computed_state === 'Overdue' ? '#fff3cd' : context.computed_state === 'Active Loan' ? '#d1ecf1' : '#e2e3e5'}
+              color={context.computed_state === 'Overdue' ? '#856404' : context.computed_state === 'Active Loan' ? '#0c5460' : '#383d41'}
+            />
+            {context.active_loan && (
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                Active Loan ID: <strong>{context.active_loan.id}</strong>
+              </span>
+            )}
+          </div>
           {context.active_loan && (
-            <span style={{ fontSize: '12px', color: '#666' }}>
-              Active Loan ID: <strong>{context.active_loan.id}</strong>
-            </span>
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '13px', color: '#555' }}>
+              <div>
+                Total to be repaid: <strong>{context.active_loan.total_amount_due}</strong>
+              </div>
+              <div>
+                Total repaid so far: <strong>{context.active_loan.total_paid}</strong>
+              </div>
+              <div>
+                Outstanding balance: <strong>{context.active_loan.outstanding_amount}</strong>
+              </div>
+            </div>
           )}
         </div>
 
@@ -343,6 +358,8 @@ export const LoanOfficerClientLoanContextPage = () => {
                 <th style={{ textAlign: 'left', padding: '10px' }}>Loan ID</th>
                 <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
                 <th style={{ textAlign: 'left', padding: '10px' }}>Principal</th>
+                <th style={{ textAlign: 'left', padding: '10px' }}>Total Due</th>
+                <th style={{ textAlign: 'left', padding: '10px' }}>Outstanding</th>
                 <th style={{ textAlign: 'left', padding: '10px' }}>Risk</th>
                 <th style={{ textAlign: 'left', padding: '10px' }}>Created</th>
               </tr>
@@ -353,6 +370,8 @@ export const LoanOfficerClientLoanContextPage = () => {
                   <td style={{ padding: '10px' }}>{l.id}</td>
                   <td style={{ padding: '10px' }}>{l.status}</td>
                   <td style={{ padding: '10px' }}>{l.principal_amount}</td>
+                  <td style={{ padding: '10px' }}>{l.total_amount_due}</td>
+                  <td style={{ padding: '10px' }}>{l.outstanding_amount}</td>
                   <td style={{ padding: '10px' }}>
                     {l.risk_label}
                     {l.max_days_overdue > 0 ? ` (${l.max_days_overdue}d)` : ''}
@@ -384,7 +403,7 @@ export const LoanOfficerClientLoanContextPage = () => {
             <div>Loading...</div>
           ) : (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#666' }}>Principal</div>
                   <div style={{ fontWeight: 'bold' }}>{loanDetails.principal_amount}</div>
@@ -396,6 +415,15 @@ export const LoanOfficerClientLoanContextPage = () => {
                 <div>
                   <div style={{ fontSize: '12px', color: '#666' }}>Installments</div>
                   <div style={{ fontWeight: 'bold' }}>{loanDetails.number_of_installments}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Totals</div>
+                  <div style={{ fontSize: '12px' }}>
+                    Total due: <strong>{loanDetails.total_amount_due}</strong>
+                    <br />
+                    Paid: <strong>{loanDetails.total_paid}</strong> | Outstanding:{' '}
+                    <strong>{loanDetails.outstanding_amount}</strong>
+                  </div>
                 </div>
               </div>
               <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>
@@ -431,6 +459,10 @@ export const LoanOfficerClientLoanContextPage = () => {
               <div style={{ marginBottom: '10px', color: '#666', fontSize: '12px' }}>
                 Risk: <strong>{schedule.risk?.label}</strong>
                 {schedule.risk?.max_days_overdue ? ` (max ${schedule.risk.max_days_overdue} days overdue)` : ''}
+                <br />
+                Total due: <strong>{schedule.total_amount_due}</strong> | Paid:{' '}
+                <strong>{schedule.total_paid}</strong> | Outstanding:{' '}
+                <strong>{schedule.outstanding_amount}</strong>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #eee' }}>
                 <thead>
