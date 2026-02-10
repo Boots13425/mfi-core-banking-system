@@ -10,6 +10,9 @@ import { SuperAdminUsers } from './pages/SuperAdminUsers';
 import { SuperAdminAuditLogs } from './pages/SuperAdminAuditLogs';
 import { SetPasswordPage } from './pages/SetPasswordPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
+import { ClientListPage } from './pages/ClientListPage';
+import { ClientRegistrationPage } from './pages/ClientRegistrationPage';
+import { ClientProfilePage } from './pages/ClientProfilePage';
 import axiosInstance from './api/axios';
 
 const SuperAdminPanel = () => {
@@ -158,6 +161,39 @@ const AppRoutes = () => {
           <RequireAuth>
             <RequireRole role="SUPER_ADMIN">
               <SuperAdminAuditLogs />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/clients"
+        element={
+          <RequireAuth>
+            <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
+              <ClientListPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/clients/new"
+        element={
+          <RequireAuth>
+            <RequireRole role="CASHIER">
+              <ClientRegistrationPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/clients/:id"
+        element={
+          <RequireAuth>
+            <RequireRole roles={['CASHIER', 'BRANCH_MANAGER']}>
+              <ClientProfilePage />
             </RequireRole>
           </RequireAuth>
         }
