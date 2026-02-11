@@ -222,7 +222,6 @@ class ClientViewSet(viewsets.ModelViewSet):
             kyc.rejection_reason = None  # Clear rejection reason when resubmitting
             kyc.save()
         
-        # Handle multiple file uploads
         # Expected format: files with keys like 'national_id', 'proof_of_address', 'photo', 'other'
         document_type_mapping = {
             'national_id': 'NATIONAL_ID',
@@ -235,31 +234,51 @@ class ClientViewSet(viewsets.ModelViewSet):
         errors = []
         
         for field_name, document_type in document_type_mapping.items():
+            # We accept one file per type; if multiple provided, take the last one.
             files = request.FILES.getlist(field_name)
-            for file in files:
-                data = {
-                    'document_type': document_type,
+            if not files:
+                continue
+
+            file = files[-1]
+
+            # Validate using existing serializer (keeps your current validation approach)
+            serializer = KYCDocumentSerializer(
+                data={'document_type': document_type, 'file': file},
+                context={'request': request}
+            )
+            if not serializer.is_valid():
+                errors.append({field_name: serializer.errors})
+                continue
+
+            # UPSERT: one document per (kyc, document_type)
+            document, created = KYCDocument.objects.get_or_create(
+                kyc=kyc,
+                document_type=document_type,
+                defaults={
+                    'uploaded_by': request.user,
                     'file': file,
                 }
-                serializer = KYCDocumentSerializer(
-                    data=data,
-                    context={'request': request}
-                )
-                
-                if serializer.is_valid():
-                    document = serializer.save(kyc=kyc)
-                    uploaded_documents.append(document)
-                    
-                    create_audit_log(
-                        actor=request.user,
-                        action='KYC_DOCUMENT_UPLOADED',
-                        target_type='KYCDocument',
-                        target_id=str(document.id),
-                        summary=f'KYC document ({document.get_document_type_display()}) uploaded for client {client.full_name} by {request.user}',
-                        ip_address=get_client_ip(request)
-                    )
-                else:
-                    errors.append({field_name: serializer.errors})
+            )
+
+            if not created:
+                # Replace existing file; model.save() deletes old file
+                document.uploaded_by = request.user
+                document.file = file
+                document.save()
+
+            uploaded_documents.append(document)
+
+            create_audit_log(
+                actor=request.user,
+                action='KYC_DOCUMENT_UPLOADED' if created else 'KYC_DOCUMENT_REPLACED',
+                target_type='KYCDocument',
+                target_id=str(document.id),
+                summary=(
+                    f'KYC document ({document.get_document_type_display()}) '
+                    f'{"uploaded" if created else "replaced"} for client {client.full_name} by {request.user}'
+                ),
+                ip_address=get_client_ip(request)
+            )
         
         if uploaded_documents:
             return Response(
