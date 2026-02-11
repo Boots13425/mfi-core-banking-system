@@ -1,12 +1,29 @@
 import uuid
 import os
+import re
 from django.db import models
 from django.conf import settings
 
 
+def safe_folder_name(value: str) -> str:
+    """
+    Convert a client name to a filesystem-safe folder name.
+    - trims
+    - spaces -> underscores
+    - removes special characters
+    - limits length to avoid very long paths
+    """
+    value = (value or "").strip()
+    value = re.sub(r"\s+", "_", value)                 # spaces -> _
+    value = re.sub(r"[^A-Za-z0-9_\-]", "", value)      # keep only safe chars
+    return value[:60] or "unknown"
+
+
 def kyc_document_upload_path(instance, filename):
     """Generate upload path for KYC documents"""
-    return f'kyc_documents/{instance.kyc.client.id}/{instance.document_type}/{filename}'
+    client = instance.kyc.client
+    client_folder = f"{client.id}_{safe_folder_name(client.full_name)}"
+    return f"kyc_documents/{client_folder}/{instance.document_type}/{filename}"
 
 
 class Client(models.Model):
@@ -40,10 +57,10 @@ class Client(models.Model):
 
 class KYC(models.Model):
     STATUS_CHOICES = [
-        ('PENDING', 'Pending'),  # KYC initiated but documents not yet uploaded
+        ('PENDING', 'Pending'),      # KYC initiated but documents not yet uploaded
         ('SUBMITTED', 'Submitted'),  # Documents uploaded, awaiting review
-        ('APPROVED', 'Approved'),  # KYC validated, client activated
-        ('REJECTED', 'Rejected'),  # KYC rejected, needs resubmission
+        ('APPROVED', 'Approved'),    # KYC validated, client activated
+        ('REJECTED', 'Rejected'),    # KYC rejected, needs resubmission
     ]
 
     client = models.OneToOneField(
@@ -108,9 +125,26 @@ class KYCDocument(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['kyc', 'document_type'],
+                name='unique_kyc_document_type'
+            )
+        ]
 
     def __str__(self):
         return f"{self.get_document_type_display()} for {self.kyc.client.full_name}"
 
     def filename(self):
         return os.path.basename(self.file.name)
+
+    def save(self, *args, **kwargs):
+        """
+        If the same KYCDocument row is updated with a new file, delete the old file first.
+        This prevents multiple copies from being kept in storage.
+        """
+        if self.pk:
+            old = KYCDocument.objects.filter(pk=self.pk).only("file").first()
+            if old and old.file and self.file and old.file.name != self.file.name:
+                old.file.delete(save=False)
+        super().save(*args, **kwargs)
