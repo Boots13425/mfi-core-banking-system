@@ -232,11 +232,26 @@ class ClientViewSet(viewsets.ModelViewSet):
         }
         
         uploaded_documents = []
+        deleted_documents = []
         errors = []
         
         for field_name, document_type in document_type_mapping.items():
             files = request.FILES.getlist(field_name)
             for file in files:
+                # Check if a document of this type already exists
+                existing_docs = kyc.documents.filter(document_type=document_type)
+                for existing_doc in existing_docs:
+                    # Delete the old file first
+                    try:
+                        if existing_doc.file:
+                            # Get the file path before deleting the model
+                            existing_doc.file.delete(save=False)
+                    except Exception:
+                        pass  # Continue even if file deletion fails
+                    # Delete the old document record
+                    existing_doc.delete()
+                    deleted_documents.append(document_type)
+                
                 data = {
                     'document_type': document_type,
                     'file': file,
@@ -262,9 +277,10 @@ class ClientViewSet(viewsets.ModelViewSet):
                     errors.append({field_name: serializer.errors})
         
         if uploaded_documents:
+            deleted_msg = f' (replaced {len(deleted_documents)} existing document(s))' if deleted_documents else ''
             return Response(
                 {
-                    'detail': f'Successfully uploaded {len(uploaded_documents)} document(s).',
+                    'detail': f'Successfully uploaded {len(uploaded_documents)} document(s){deleted_msg}.',
                     'documents': KYCDocumentSerializer(uploaded_documents, many=True).data,
                     'errors': errors if errors else None,
                 },

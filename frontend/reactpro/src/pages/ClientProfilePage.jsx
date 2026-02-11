@@ -123,8 +123,8 @@ export const ClientProfilePage = () => {
         },
       });
       
-      const uploadedCount = response.data.documents?.length || 0;
-      setKycSuccess(`Successfully uploaded ${uploadedCount} document(s)!`);
+      // Display the full message from backend (includes info about replaced documents)
+      setKycSuccess(response.data.detail);
       
       // Clear all file inputs
       setNationalIdFiles([]);
