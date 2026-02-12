@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import axiosInstance from '../api/axios';
@@ -6,12 +6,26 @@ import axiosInstance from '../api/axios';
 export const ClientRegistrationPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const branchDisplay = useMemo(() => {
+    if (!user) return '';
+    // Try multiple shapes safely (depends on how your auth payload is built)
+    if (typeof user.branch_display === 'string' && user.branch_display) return user.branch_display;
+    if (typeof user.branch_name === 'string' && user.branch_name) return user.branch_name;
+    if (typeof user.branch === 'string' && user.branch) return user.branch; // sometimes branch is already a label
+    if (user.branch && typeof user.branch === 'object') {
+      return user.branch.name || user.branch.branch_name || user.branch.title || String(user.branch);
+    }
+    return '';
+  }, [user]);
+
   const [formData, setFormData] = useState({
     full_name: '',
     national_id: '',
     phone: '',
     email: '',
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -31,6 +45,10 @@ export const ClientRegistrationPage = () => {
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Invalid email format';
     }
+    // Ensure cashier has a branch (UX-friendly message; backend also enforces)
+    if (user?.role === 'CASHIER' && !branchDisplay) {
+      errors.branch = 'Your account is not assigned to a branch. Contact the super admin.';
+    }
     return errors;
   };
 
@@ -40,7 +58,6 @@ export const ClientRegistrationPage = () => {
       ...prev,
       [name]: value,
     }));
-    // Clear validation error for this field
     if (validationErrors[name]) {
       setValidationErrors((prev) => ({
         ...prev,
@@ -54,7 +71,6 @@ export const ClientRegistrationPage = () => {
     setError(null);
     setSuccess(false);
 
-    // Validate form
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -73,7 +89,6 @@ export const ClientRegistrationPage = () => {
       });
       setValidationErrors({});
 
-      // Redirect to client profile after 2 seconds
       setTimeout(() => {
         navigate(`/clients/${response.data.id}`);
       }, 2000);
@@ -85,7 +100,6 @@ export const ClientRegistrationPage = () => {
       } else if (err.response?.data?.detail) {
         setError(String(err.response.data.detail));
       } else if (err.response?.data) {
-        // Handle field-specific errors where values may be arrays or strings
         try {
           const errorMessages = Object.entries(err.response.data)
             .map(([field, messages]) => {
@@ -141,6 +155,34 @@ export const ClientRegistrationPage = () => {
       )}
 
       <form onSubmit={handleSubmit}>
+        {/* Branch (Read-only) */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Branch *
+          </label>
+          <input
+            type="text"
+            value={branchDisplay || ''}
+            disabled
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: validationErrors.branch ? '2px solid #dc3545' : '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '14px',
+              boxSizing: 'border-box',
+              background: '#f8f9fa',
+              color: '#333',
+            }}
+            placeholder="Your branch will appear here"
+          />
+          {validationErrors.branch && (
+            <div style={{ color: '#dc3545', fontSize: '12px', marginTop: '5px' }}>
+              {validationErrors.branch}
+            </div>
+          )}
+        </div>
+
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
             Full Name *

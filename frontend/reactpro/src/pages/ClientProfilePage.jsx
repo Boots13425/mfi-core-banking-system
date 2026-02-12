@@ -456,8 +456,9 @@ export const ClientProfilePage = () => {
               Branch
             </label>
             <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
-              {client.branch || 'N/A'}
-            </p>
+  {client.branch_display || client.branch_name || client.branch || 'N/A'}
+</p>
+
           </div>
 
           <div>

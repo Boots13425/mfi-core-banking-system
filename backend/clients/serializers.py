@@ -3,6 +3,8 @@ from .models import Client, KYC, KYCDocument
 
 
 class ClientSerializer(serializers.ModelSerializer):
+    branch_display = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Client
         fields = [
@@ -14,14 +16,29 @@ class ClientSerializer(serializers.ModelSerializer):
             'email',
             'address',
             'status',
-            'branch',
+            'branch',          # kept for compatibility (will be an id)
+            'branch_display',  # new: readable label for UI
             'created_by',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ('client_number', 'created_by', 'created_at', 'updated_at')
+        # branch is now read-only so cashier can't set it manually
+        read_only_fields = ('client_number', 'created_by', 'branch', 'created_at', 'updated_at')
+
+    def get_branch_display(self, obj):
+        """
+        Return a human-friendly display of the branch.
+        Safest approach: use Branch.__str__() if it exists.
+        """
+        if not obj.branch:
+            return None
+        return str(obj.branch)
 
     def validate(self, data):
+        """
+        Duplicate detection: national_id OR phone OR email.
+        (Improved to exclude current instance on update so edits don't false-trigger.)
+        """
         national_id = data.get('national_id')
         phone = data.get('phone')
         email = data.get('email')
@@ -34,19 +51,34 @@ class ClientSerializer(serializers.ModelSerializer):
         if email:
             duplicates = duplicates | Client.objects.filter(email__iexact=email)
 
-        # Exclude soft-deactivated clients? We treat duplicates regardless of status to avoid duplicates.
+        # Exclude self on update
+        if self.instance and self.instance.pk:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+
         if duplicates.exists():
             raise serializers.ValidationError({'detail': 'A client with the same national ID, phone, or email already exists.'})
 
         return data
 
     def create(self, validated_data):
+        """
+        Force client.branch based on the authenticated user's branch for:
+        - CASHIER
+        - BRANCH_MANAGER
+        - LOAN_OFFICER
+        This prevents creating clients for another branch (or spoofing branch id).
+        """
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
-            validated_data['created_by'] = request.user
-            # If loan officer has a branch and branch not supplied, set it
-            if not validated_data.get('branch') and getattr(request.user, 'branch', None):
-                validated_data['branch'] = request.user.branch
+            user = request.user
+            validated_data['created_by'] = user
+
+            # For operational roles, branch must always come from the user's branch
+            if user.role in ['CASHIER', 'BRANCH_MANAGER', 'LOAN_OFFICER']:
+                if not getattr(user, 'branch', None):
+                    raise serializers.ValidationError({'detail': 'Your account is not assigned to a branch. Contact the super admin.'})
+                validated_data['branch'] = user.branch
+
         return super().create(validated_data)
 
     def to_representation(self, instance):
@@ -63,7 +95,7 @@ class ClientSerializer(serializers.ModelSerializer):
 class KYCDocumentSerializer(serializers.ModelSerializer):
     filename = serializers.SerializerMethodField()
     uploaded_by_username = serializers.CharField(source='uploaded_by.username', read_only=True)
-    
+
     def get_filename(self, obj):
         return obj.filename()
 
