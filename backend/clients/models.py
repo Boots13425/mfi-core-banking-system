@@ -21,9 +21,10 @@ def safe_folder_name(value: str) -> str:
 
 def kyc_document_upload_path(instance, filename):
     """Generate upload path for KYC documents"""
-    client = instance.kyc.client
-    client_folder = f"{client.id}_{safe_folder_name(client.full_name)}"
-    return f"kyc_documents/{client_folder}/{instance.document_type}/{filename}"
+    # Sanitize client name for use in file path (replace spaces and special chars with underscores)
+    client_name = ''.join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in instance.kyc.client.full_name)
+    client_name = client_name.strip().replace(' ', '_')
+    return f'kyc_documents/{instance.kyc.client.id}_{client_name}/{instance.document_type}/{filename}'
 
 
 class Client(models.Model):
