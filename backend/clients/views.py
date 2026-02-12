@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+
 from .models import Client, KYC, KYCDocument
 from .serializers import (
     ClientSerializer, KYCSerializer, KYCDocumentSerializer,
@@ -19,13 +20,18 @@ class ClientViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all()
     permission_classes = (IsCashierOrBranchManagerReadOnly,)
 
+    # ✅ STRICT: branch scoping for operational roles
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
         params = self.request.query_params
 
-        # Branch managers see only clients in their branch
-        if user.role == 'BRANCH_MANAGER' and user.branch:
+        role = (getattr(user, 'role', '') or '').strip().upper()
+
+        # STRICT: operational roles must have a branch, and can only see clients in their branch
+        if role in ['CASHIER', 'BRANCH_MANAGER', 'LOAN_OFFICER']:
+            if not getattr(user, 'branch', None):
+                return qs.none()
             qs = qs.filter(branch=user.branch)
 
         # Filters: branch, status, name
@@ -33,14 +39,23 @@ class ClientViewSet(viewsets.ModelViewSet):
         status_param = params.get('status')
         name = params.get('name')
 
-        if branch:
+        # Only non-operational users (e.g SUPER_ADMIN/AUDITOR) can filter by arbitrary branch
+        if branch and role not in ['CASHIER', 'BRANCH_MANAGER', 'LOAN_OFFICER']:
             qs = qs.filter(branch__id=branch)
+
         if status_param:
             qs = qs.filter(status__iexact=status_param)
+
         if name:
             qs = qs.filter(full_name__icontains=name)
 
         return qs
+
+    # ✅ Prevent bypass: /clients/<id>/ from another branch
+    def get_object(self):
+        obj = get_object_or_404(self.get_queryset(), pk=self.kwargs['pk'])
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     def perform_create(self, serializer):
         client = serializer.save()
@@ -83,22 +98,23 @@ class ClientViewSet(viewsets.ModelViewSet):
         Only allowed for Cashier and Branch Manager after KYC is approved.
         No hard deletes are allowed in this system.
         """
-        client = get_object_or_404(Client, pk=pk)
-        
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
         # Check if user has permission (Cashier or Branch Manager)
         if request.user.role not in ['CASHIER', 'BRANCH_MANAGER']:
             return Response(
                 {'detail': 'You do not have permission to deactivate clients.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Branch Manager can only deactivate clients in their branch
         if request.user.role == 'BRANCH_MANAGER' and client.branch != request.user.branch:
             return Response(
                 {'detail': 'You can only deactivate clients in your branch.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Check if KYC is approved (only allow deactivation after approval)
         try:
             kyc = client.kyc
@@ -112,7 +128,7 @@ class ClientViewSet(viewsets.ModelViewSet):
                 {'detail': 'Client KYC must be approved before deactivation.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         old_status = client.status
         client.status = 'INACTIVE'
         client.save()
@@ -134,28 +150,29 @@ class ClientViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='initiate-kyc')
     def initiate_kyc(self, request, pk=None):
         """Initiate KYC for a client (Cashier only)"""
-        client = get_object_or_404(Client, pk=pk)
-        
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
         if request.user.role != 'CASHIER':
             return Response(
                 {'detail': 'Only cashiers can initiate KYC.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Check if KYC already exists
         if hasattr(client, 'kyc'):
             return Response(
                 {'detail': 'KYC already exists for this client.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Create KYC
         kyc = KYC.objects.create(
             client=client,
             status='PENDING',
             initiated_by=request.user
         )
-        
+
         create_audit_log(
             actor=request.user,
             action='KYC_INITIATED',
@@ -164,29 +181,30 @@ class ClientViewSet(viewsets.ModelViewSet):
             summary=f'KYC initiated for client {client.full_name} by {request.user}',
             ip_address=get_client_ip(request)
         )
-        
+
         serializer = KYCSerializer(kyc)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'], url_path='kyc')
     def get_kyc(self, request, pk=None):
         """Get KYC details for a client"""
-        client = get_object_or_404(Client, pk=pk)
-        
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
         # Check permissions
         if request.user.role not in ['CASHIER', 'BRANCH_MANAGER']:
             return Response(
                 {'detail': 'You do not have permission to view KYC.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Branch Manager can only view KYC for clients in their branch
         if request.user.role == 'BRANCH_MANAGER' and client.branch != request.user.branch:
             return Response(
                 {'detail': 'You can only view KYC for clients in your branch.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         try:
             kyc = client.kyc
             serializer = KYCSerializer(kyc)
@@ -200,14 +218,15 @@ class ClientViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='kyc/upload-documents', parser_classes=[MultiPartParser, FormParser])
     def upload_kyc_documents(self, request, pk=None):
         """Upload multiple documents for KYC (Cashier only)"""
-        client = get_object_or_404(Client, pk=pk)
-        
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
         if request.user.role != 'CASHIER':
             return Response(
                 {'detail': 'Only cashiers can upload KYC documents.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         try:
             kyc = client.kyc
         except KYC.DoesNotExist:
@@ -215,13 +234,13 @@ class ClientViewSet(viewsets.ModelViewSet):
                 {'detail': 'KYC not initiated. Please initiate KYC first.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Update KYC status to SUBMITTED if it was PENDING or REJECTED
         if kyc.status in ['PENDING', 'REJECTED']:
             kyc.status = 'SUBMITTED'
             kyc.rejection_reason = None  # Clear rejection reason when resubmitting
             kyc.save()
-        
+
         # Expected format: files with keys like 'national_id', 'proof_of_address', 'photo', 'other'
         document_type_mapping = {
             'national_id': 'NATIONAL_ID',
@@ -229,19 +248,17 @@ class ClientViewSet(viewsets.ModelViewSet):
             'photo': 'PHOTO',
             'other': 'OTHER',
         }
-        
+
         uploaded_documents = []
         errors = []
-        
+
         for field_name, document_type in document_type_mapping.items():
-            # We accept one file per type; if multiple provided, take the last one.
             files = request.FILES.getlist(field_name)
             if not files:
                 continue
 
             file = files[-1]
 
-            # Validate using existing serializer (keeps your current validation approach)
             serializer = KYCDocumentSerializer(
                 data={'document_type': document_type, 'file': file},
                 context={'request': request}
@@ -250,7 +267,6 @@ class ClientViewSet(viewsets.ModelViewSet):
                 errors.append({field_name: serializer.errors})
                 continue
 
-            # UPSERT: one document per (kyc, document_type)
             document, created = KYCDocument.objects.get_or_create(
                 kyc=kyc,
                 document_type=document_type,
@@ -261,7 +277,6 @@ class ClientViewSet(viewsets.ModelViewSet):
             )
 
             if not created:
-                # Replace existing file; model.save() deletes old file
                 document.uploaded_by = request.user
                 document.file = file
                 document.save()
@@ -279,7 +294,7 @@ class ClientViewSet(viewsets.ModelViewSet):
                 ),
                 ip_address=get_client_ip(request)
             )
-        
+
         if uploaded_documents:
             return Response(
                 {
@@ -298,21 +313,21 @@ class ClientViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='kyc/approve')
     def approve_kyc(self, request, pk=None):
         """Approve KYC and activate client (Branch Manager only)"""
-        client = get_object_or_404(Client, pk=pk)
-        
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
         if request.user.role != 'BRANCH_MANAGER':
             return Response(
                 {'detail': 'Only branch managers can approve KYC.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        # Branch Manager can only approve KYC for clients in their branch
+
         if client.branch != request.user.branch:
             return Response(
                 {'detail': 'You can only approve KYC for clients in your branch.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         try:
             kyc = client.kyc
         except KYC.DoesNotExist:
@@ -320,36 +335,34 @@ class ClientViewSet(viewsets.ModelViewSet):
                 {'detail': 'KYC not found for this client.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         if kyc.status == 'APPROVED':
             return Response(
                 {'detail': 'KYC is already approved.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if kyc.status != 'SUBMITTED':
             return Response(
                 {'detail': 'KYC must be submitted before approval.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Check if documents exist
+
         if not kyc.documents.exists():
             return Response(
                 {'detail': 'Cannot approve KYC without documents.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         with transaction.atomic():
             kyc.status = 'APPROVED'
             kyc.reviewed_by = request.user
             kyc.rejection_reason = None
             kyc.save()
-            
-            # Activate client
+
             client.status = 'ACTIVE'
             client.save()
-        
+
         create_audit_log(
             actor=request.user,
             action='KYC_APPROVED',
@@ -358,28 +371,28 @@ class ClientViewSet(viewsets.ModelViewSet):
             summary=f'KYC approved and client {client.full_name} activated by {request.user}',
             ip_address=get_client_ip(request)
         )
-        
+
         serializer = KYCSerializer(kyc)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='kyc/reject')
     def reject_kyc(self, request, pk=None):
         """Reject KYC and return to cashier (Branch Manager only)"""
-        client = get_object_or_404(Client, pk=pk)
-        
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
         if request.user.role != 'BRANCH_MANAGER':
             return Response(
                 {'detail': 'Only branch managers can reject KYC.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        # Branch Manager can only reject KYC for clients in their branch
+
         if client.branch != request.user.branch:
             return Response(
                 {'detail': 'You can only reject KYC for clients in your branch.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         try:
             kyc = client.kyc
         except KYC.DoesNotExist:
@@ -387,18 +400,18 @@ class ClientViewSet(viewsets.ModelViewSet):
                 {'detail': 'KYC not found for this client.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         serializer = RejectKYCSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         rejection_reason = serializer.validated_data['rejection_reason']
-        
+
         kyc.status = 'REJECTED'
         kyc.reviewed_by = request.user
         kyc.rejection_reason = rejection_reason
         kyc.save()
-        
+
         create_audit_log(
             actor=request.user,
             action='KYC_REJECTED',
@@ -407,7 +420,7 @@ class ClientViewSet(viewsets.ModelViewSet):
             summary=f'KYC rejected for client {client.full_name} by {request.user}. Reason: {rejection_reason}',
             ip_address=get_client_ip(request)
         )
-        
+
         serializer_response = KYCSerializer(kyc)
         return Response(serializer_response.data, status=status.HTTP_200_OK)
 
