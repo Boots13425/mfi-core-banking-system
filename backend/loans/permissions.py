@@ -1,24 +1,54 @@
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.permissions import BasePermission
 
 
 class IsLoanOfficer(BasePermission):
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.role == "LOAN_OFFICER"
-        )
-
-
-class LoanOfficerReadOnlyClientProfile(BasePermission):
-    """
-    Used for endpoints that expose read-only client summary to loan officers.
-    """
-
+    """Only loan officers can access."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        if request.method in SAFE_METHODS and request.user.role == "LOAN_OFFICER":
-            return True
+        # Prefer direct `role` on the user (accounts.User). Fallback to `profile` if present.
+        role = getattr(request.user, 'role', None)
+        if role:
+            return role == 'LOAN_OFFICER'
+        if hasattr(request.user, 'profile'):
+            return getattr(request.user.profile, 'role', None) == 'LOAN_OFFICER'
         return False
 
+
+class IsBranchManager(BasePermission):
+    """Only branch managers can access."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        role = getattr(request.user, 'role', None)
+        if role:
+            return role == 'BRANCH_MANAGER'
+        if hasattr(request.user, 'profile'):
+            return getattr(request.user.profile, 'role', None) == 'BRANCH_MANAGER'
+        return False
+
+
+class IsCashier(BasePermission):
+    """Only cashiers can access."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        role = getattr(request.user, 'role', None)
+        if role:
+            return role == 'CASHIER'
+        if hasattr(request.user, 'profile'):
+            return getattr(request.user.profile, 'role', None) == 'CASHIER'
+        return False
+
+
+class IsLoanOfficerOrBranchManager(BasePermission):
+    """Loan officer or branch manager."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        role = getattr(request.user, 'role', None)
+        if role:
+            return role in ['LOAN_OFFICER', 'BRANCH_MANAGER']
+        if hasattr(request.user, 'profile'):
+            return getattr(request.user.profile, 'role', None) in ['LOAN_OFFICER', 'BRANCH_MANAGER']
+        return False

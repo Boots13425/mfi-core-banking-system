@@ -1,654 +1,949 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+// src/pages/LoanOfficerClientLoanContextPage.jsx
+import React, { useState, useEffect, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
+  getLoanContext,
+  getLoanProducts,
   createLoan,
-  fetchClientLoanContext,
-  fetchLoan,
-  fetchLoanSchedule,
-  recordRepayment,
-} from '../api/loans';
+  uploadLoanDocument,
+  submitLoan,
+  postRepayment,
+} from "../api/loans";
 
-const Badge = ({ text, bg, color }) => (
-  <span
-    style={{
-      padding: '6px 12px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontWeight: 'bold',
-      background: bg,
-      color,
-    }}
-  >
-    {text}
-  </span>
-);
-
-const ModalShell = ({ title, onClose, children, width = 720 }) => (
-  <div
-    style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.35)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'flex-start',
-      padding: '60px 16px',
-      zIndex: 9999,
-    }}
-  >
-    <div
-      style={{
-        width: '100%',
-        maxWidth: `${width}px`,
-        background: '#fff',
-        borderRadius: '6px',
-        border: '1px solid #ddd',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          padding: '14px 16px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: '1px solid #eee',
-          background: '#f8f9fa',
-        }}
-      >
-        <strong>{title}</strong>
-        <button
-          onClick={onClose}
-          style={{
-            padding: '6px 10px',
-            background: '#6c757d',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Close
-        </button>
-      </div>
-      <div style={{ padding: '16px' }}>{children}</div>
-    </div>
-  </div>
-);
-
-export const LoanOfficerClientLoanContextPage = () => {
+const LoanOfficerClientLoanContextPage = () => {
   const { clientId } = useParams();
   const navigate = useNavigate();
 
-  const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [context, setContext] = useState(null);
+  const [products, setProducts] = useState([]);
   const [error, setError] = useState(null);
 
+  // UI toggles
   const [showCreateLoan, setShowCreateLoan] = useState(false);
-  const [showSchedule, setShowSchedule] = useState(false);
-  const [showLoanDetails, setShowLoanDetails] = useState(false);
+  const [showUploadDoc, setShowUploadDoc] = useState(false);
   const [showRepayment, setShowRepayment] = useState(false);
 
-  const [loanDetails, setLoanDetails] = useState(null);
-  const [schedule, setSchedule] = useState(null);
+  // Form states (NOTE: term_months)
+  const [createFormData, setCreateFormData] = useState({
+    product: "",
+    amount: "",
+    term_months: "",
+    purpose: "",
+  });
 
-  const refreshContext = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchClientLoanContext(clientId);
-      setContext(data);
-    } catch (e) {
-      setError(e?.response?.data?.detail || 'Failed to load loan context.');
-      setContext(null);
-    } finally {
-      setLoading(false);
+  const [uploadFormData, setUploadFormData] = useState({
+    document_type: "",
+    document_file: null,
+    label: "",
+    description: "",
+  });
+
+  const [repaymentFormData, setRepaymentFormData] = useState({
+    amount: "",
+    payment_method: "CASH",
+    payment_reference: "",
+    notes: "",
+  });
+
+  const styles = useMemo(
+    () => ({
+      page: {
+        minHeight: "100vh",
+        background: "#fafafa",
+        padding: "20px",
+        fontFamily: "Arial, sans-serif",
+        color: "#333",
+      },
+      container: {
+        maxWidth: 1200,
+        margin: "0 auto",
+      },
+      topBar: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        marginBottom: 18,
+      },
+      backBtn: {
+        background: "#fff",
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: "10px 14px",
+        cursor: "pointer",
+        fontWeight: "bold",
+      },
+      titleWrap: { display: "flex", flexDirection: "column", gap: 4 },
+      title: { margin: 0, fontSize: 20, fontWeight: 700 },
+      subtitle: { margin: 0, color: "#999", fontSize: 13 },
+
+      grid: {
+        display: "grid",
+        gridTemplateColumns: "1.2fr 0.8fr",
+        gap: 16,
+      },
+      card: {
+        background: "#fff",
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: 16,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+      },
+      cardHeader: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        marginBottom: 12,
+      },
+      cardTitle: {
+        margin: 0,
+        fontSize: 16,
+        fontWeight: 700,
+      },
+      pill: {
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "6px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 700,
+        border: "1px solid #ddd",
+        background: "#fafafa",
+        color: "#666",
+        whiteSpace: "nowrap",
+      },
+
+      infoRow: {
+        display: "grid",
+        gridTemplateColumns: "140px 1fr",
+        gap: 10,
+        padding: "8px 0",
+        borderBottom: "1px solid #eee",
+      },
+      label: { color: "#999", fontSize: 13, fontWeight: 700 },
+      value: { fontSize: 14, fontWeight: 700 },
+
+      error: {
+        background: "#f8d7da",
+        border: "1px solid #f5c6cb",
+        color: "#721c24",
+        borderRadius: 8,
+        padding: "10px 12px",
+        marginBottom: 14,
+        fontWeight: 700,
+      },
+      successNote: {
+        background: "#d4edda",
+        border: "1px solid #c3e6cb",
+        color: "#155724",
+        borderRadius: 8,
+        padding: "10px 12px",
+        marginBottom: 14,
+        fontWeight: 700,
+      },
+
+      sectionTitle: {
+        marginTop: 0,
+        marginBottom: 10,
+        fontSize: 14,
+        fontWeight: 700,
+        color: "#333",
+      },
+
+      table: {
+        width: "100%",
+        borderCollapse: "collapse",
+        overflow: "hidden",
+        borderRadius: 8,
+        border: "1px solid #ddd",
+      },
+      th: {
+        background: "#fafafa",
+        textAlign: "left",
+        padding: "10px 12px",
+        borderBottom: "1px solid #ddd",
+        fontSize: 12,
+        color: "#666",
+        fontWeight: 700,
+      },
+      td: {
+        padding: "10px 12px",
+        borderBottom: "1px solid #eee",
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#333",
+        verticalAlign: "top",
+      },
+      link: { color: "#007bff", fontWeight: 700, cursor: "pointer" },
+
+      actionsCol: { display: "flex", flexDirection: "column", gap: 10 },
+      btn: {
+        width: "100%",
+        borderRadius: 8,
+        padding: "10px 12px",
+        cursor: "pointer",
+        fontWeight: 700,
+        border: "1px solid #ddd",
+        background: "#fff",
+      },
+      btnPrimary: {
+        background: "#007bff",
+        color: "#fff",
+        border: "1px solid #007bff",
+      },
+      btnDanger: {
+        background: "#dc3545",
+        color: "#fff",
+        border: "1px solid #dc3545",
+      },
+      btnMuted: {
+        background: "#fafafa",
+        color: "#333",
+      },
+      inlineBtn: {
+        borderRadius: 8,
+        padding: "8px 12px",
+        cursor: "pointer",
+        fontWeight: 700,
+        border: "1px solid #ddd",
+        background: "#fff",
+      },
+
+      form: {
+        marginTop: 12,
+        background: "#fff",
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: 14,
+      },
+      fieldGrid: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12,
+      },
+      field: { display: "flex", flexDirection: "column", gap: 6 },
+      input: {
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: "10px 12px",
+        fontSize: 14,
+        outline: "none",
+      },
+      select: {
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: "10px 12px",
+        fontSize: 14,
+        outline: "none",
+        background: "#fff",
+      },
+      textarea: {
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: "10px 12px",
+        fontSize: 14,
+        outline: "none",
+        minHeight: 88,
+        resize: "vertical",
+      },
+      formActions: {
+        display: "flex",
+        gap: 10,
+        justifyContent: "flex-end",
+        marginTop: 12,
+        flexWrap: "wrap",
+      },
+
+      empty: {
+        border: "1px dashed #ddd",
+        background: "#fafafa",
+        borderRadius: 8,
+        padding: 14,
+        color: "#999",
+        fontWeight: 700,
+      },
+
+      small: { fontSize: 12, color: "#999", fontWeight: 700 },
+    }),
+    []
+  );
+
+  const statusPill = (text) => {
+    const t = String(text || "").toUpperCase();
+    let bg = "#fafafa";
+    let bd = "#ddd";
+    let color = "#666";
+
+    if (t.includes("APPROV")) {
+      bg = "#d4edda";
+      bd = "#c3e6cb";
+      color = "#155724";
+    } else if (t.includes("REJECT") || t.includes("DECLIN")) {
+      bg = "#f8d7da";
+      bd = "#f5c6cb";
+      color = "#721c24";
+    } else if (t.includes("SUBMIT") || t.includes("PEND")) {
+      bg = "#fff3cd";
+      bd = "#ffeeba";
+      color = "#856404";
+    } else if (t.includes("ACTIVE")) {
+      bg = "#d1ecf1";
+      bd = "#bee5eb";
+      color = "#0c5460";
     }
+    return <span style={{ ...styles.pill, background: bg, borderColor: bd, color }}>{text}</span>;
+  };
+
+  const reloadContext = async () => {
+    const contextData = await getLoanContext(clientId);
+    setContext(contextData);
   };
 
   useEffect(() => {
-    refreshContext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const contextData = await getLoanContext(clientId);
+        setContext(contextData);
+
+        const productsData = await getLoanProducts();
+        setProducts(productsData);
+
+        setError(null);
+      } catch (err) {
+        setError(err.response?.data?.error || "Failed to load loan context");
+        console.error("Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [clientId]);
 
-  const activeLoanId = context?.active_loan?.id;
+  const handleCreateLoan = async (e) => {
+    e.preventDefault();
+    try {
+      const data = {
+        client: clientId,
+        product: parseInt(createFormData.product, 10),
+        amount: parseFloat(createFormData.amount),
+        term_months: parseInt(createFormData.term_months, 10),
+        purpose: createFormData.purpose || null,
+      };
 
-  const riskBadge = useMemo(() => {
-    const label = context?.risk?.label || 'OK';
-    if (label === 'DELINQUENT') return { text: 'DELINQUENT', bg: '#f8d7da', color: '#721c24' };
-    if (label === 'AT_RISK') return { text: 'AT RISK', bg: '#fff3cd', color: '#856404' };
-    return { text: 'OK', bg: '#d4edda', color: '#155724' };
-  }, [context]);
-
-  const eligibleToCreateLoan = useMemo(() => {
-    return !!context && !context.active_loan;
-  }, [context]);
-
-  const loadLoanDetails = async () => {
-    if (!activeLoanId) return;
-    const data = await fetchLoan(activeLoanId);
-    setLoanDetails(data);
+      await createLoan(data);
+      setShowCreateLoan(false);
+      setCreateFormData({ product: "", amount: "", term_months: "", purpose: "" });
+      await reloadContext();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to create loan");
+    }
   };
 
-  const loadSchedule = async () => {
-    if (!activeLoanId) return;
-    const data = await fetchLoanSchedule(activeLoanId);
-    setSchedule(data);
+  const handleUploadDocument = async (e) => {
+    e.preventDefault();
+
+    if (!uploadFormData.document_file) {
+      setError("Please select a file");
+      return;
+    }
+    if (!context?.active_loan) {
+      setError("No active loan found");
+      return;
+    }
+
+    try {
+      await uploadLoanDocument(context.active_loan.id, uploadFormData);
+      setShowUploadDoc(false);
+      setUploadFormData({ document_type: "", document_file: null, label: "", description: "" });
+      await reloadContext();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to upload document");
+    }
+  };
+
+  const handleSubmitLoan = async () => {
+    if (!context?.active_loan) {
+      setError("No active loan found");
+      return;
+    }
+
+    try {
+      await submitLoan(context.active_loan.id);
+      await reloadContext();
+      alert("Loan submitted successfully");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to submit loan");
+    }
+  };
+
+  const handlePostRepayment = async (e) => {
+    e.preventDefault();
+
+    if (!context?.active_loan) {
+      setError("No active loan found");
+      return;
+    }
+
+    try {
+      const data = {
+        amount: parseFloat(repaymentFormData.amount),
+        payment_method: repaymentFormData.payment_method,
+        payment_reference: repaymentFormData.payment_reference,
+        notes: repaymentFormData.notes,
+      };
+
+      await postRepayment(context.active_loan.id, data);
+      setShowRepayment(false);
+      setRepaymentFormData({
+        amount: "",
+        payment_method: "CASH",
+        payment_reference: "",
+        notes: "",
+      });
+
+      await reloadContext();
+      alert("Repayment posted successfully");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to post repayment");
+    }
   };
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading loan context...</div>;
-  }
-
-  if (error || !context) {
     return (
-      <div style={{ padding: '20px', maxWidth: '760px', margin: '0 auto' }}>
-        <div
-          style={{
-            background: '#f8d7da',
-            border: '1px solid #f5c6cb',
-            color: '#721c24',
-            padding: '12px',
-            borderRadius: '4px',
-            marginBottom: '16px',
-          }}
-        >
-          {error || 'Unable to load context.'}
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <div style={styles.card}>
+            <p style={{ margin: 0, fontWeight: 900 }}>Loading loan context…</p>
+            <p style={{ marginTop: 6, ...styles.small }}>Please wait.</p>
+          </div>
         </div>
-        <button
-          onClick={() => navigate('/loan-officer/clients')}
-          style={{
-            padding: '10px 20px',
-            background: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-          }}
-        >
-          Back to Clients
-        </button>
       </div>
     );
   }
 
-  const client = context.client;
-  const kyc = client?.kyc_summary || {};
+  const client = context?.client;
+  const activeLoan = context?.active_loan;
+  const applicationLoan = context?.application_loan;
+  const loans = context?.loans || [];
+  const loanDocs = context?.loan_documents || [];
+  const kycDocs = context?.kyc_documents || [];
+  const kycStatus = context?.kyc_status;
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1100px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-        <button
-          onClick={() => navigate('/loan-officer/clients')}
-          style={{
-            padding: '8px 16px',
-            background: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          ← Back to Clients
-        </button>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <Badge text={riskBadge.text} bg={riskBadge.bg} color={riskBadge.color} />
-          {context?.risk?.max_days_overdue > 0 && (
-            <span style={{ color: '#666', fontSize: '12px' }}>
-              Max days overdue: <strong>{context.risk.max_days_overdue}</strong>
-            </span>
-          )}
-        </div>
-      </div>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        {/* Top Bar */}
+        <div style={styles.topBar}>
+          <button style={styles.backBtn} onClick={() => navigate("/loan-officer/clients")}>
+            ← Back to Clients
+          </button>
 
-      {/* Client Summary */}
-      <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '4px', padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-          <h1 style={{ margin: 0 }}>{client.full_name}</h1>
-          <Badge text={client.status} bg="#d4edda" color="#155724" />
+          <div style={styles.titleWrap}>
+            <h1 style={styles.title}>Client Loan Context</h1>
+            <p style={styles.subtitle}>
+              View client profile, KYC documents, and manage loan workflow.
+            </p>
+          </div>
+
+          <div />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
-          <div>
-            <div style={{ fontSize: '12px', color: '#666' }}>Client Code</div>
-            <div style={{ fontWeight: 'bold' }}>{client.client_number}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#666' }}>National ID</div>
-            <div style={{ fontWeight: 'bold' }}>{client.national_id || 'N/A'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#666' }}>Phone</div>
-            <div style={{ fontWeight: 'bold' }}>{client.phone || 'N/A'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#666' }}>KYC Summary (read-only)</div>
-            <div style={{ fontWeight: 'bold' }}>
-              {kyc.status ? `Status: ${kyc.status}` : 'No KYC record'}
-              {kyc.rejection_reason ? ` (Reason: ${kyc.rejection_reason})` : ''}
-            </div>
-          </div>
-        </div>
-      </div>
+        {error && <div style={styles.error}>{error}</div>}
 
-      {/* Loan Overview */}
-      <div style={{ marginTop: '16px', background: '#fff', border: '1px solid #ddd', borderRadius: '4px', padding: '20px' }}>
-        <h2 style={{ marginTop: 0 }}>Loan Overview</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ color: '#666' }}>Loan status:</div>
-            <Badge
-              text={context.computed_state}
-              bg={context.computed_state === 'Overdue' ? '#fff3cd' : context.computed_state === 'Active Loan' ? '#d1ecf1' : '#e2e3e5'}
-              color={context.computed_state === 'Overdue' ? '#856404' : context.computed_state === 'Active Loan' ? '#0c5460' : '#383d41'}
-            />
-            {context.active_loan && (
-              <span style={{ fontSize: '12px', color: '#666' }}>
-                Active Loan ID: <strong>{context.active_loan.id}</strong>
-              </span>
-            )}
-          </div>
-          {context.active_loan && (
-            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '13px', color: '#555' }}>
-              <div>
-                Total to be repaid: <strong>{context.active_loan.total_amount_due}</strong>
+        {/* Main Layout */}
+        <div style={styles.grid}>
+          {/* LEFT: Client + Loan info */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Client Card */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <h2 style={styles.cardTitle}>Client Information</h2>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {statusPill(client?.status || "UNKNOWN")}
+                  {statusPill(kycStatus || "KYC_UNKNOWN")}
+                </div>
               </div>
+
               <div>
-                Total repaid so far: <strong>{context.active_loan.total_paid}</strong>
-              </div>
-              <div>
-                Outstanding balance: <strong>{context.active_loan.outstanding_amount}</strong>
+                <div style={styles.infoRow}>
+                  <div style={styles.label}>Name</div>
+                  <div style={styles.value}>{client?.full_name || "—"}</div>
+                </div>
+                <div style={styles.infoRow}>
+                  <div style={styles.label}>National ID</div>
+                  <div style={styles.value}>{client?.national_id || "—"}</div>
+                </div>
+                <div style={styles.infoRow}>
+                  <div style={styles.label}>Phone</div>
+                  <div style={styles.value}>{client?.phone || "—"}</div>
+                </div>
+                <div style={styles.infoRow}>
+                  <div style={styles.label}>Email</div>
+                  <div style={styles.value}>{client?.email || "—"}</div>
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Actions */}
-        <div style={{ marginTop: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {eligibleToCreateLoan && (
-            <button
-              onClick={() => setShowCreateLoan(true)}
-              style={{
-                padding: '10px 16px',
-                background: '#28a745',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
-            >
-              Create Loan
-            </button>
-          )}
-
-          {context.active_loan && (
-            <>
-              <button
-                onClick={async () => {
-                  await loadLoanDetails();
-                  setShowLoanDetails(true);
-                }}
-                style={{
-                  padding: '10px 16px',
-                  background: '#007bff',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
-                View Loan
-              </button>
-              <button
-                onClick={async () => {
-                  await loadSchedule();
-                  setShowSchedule(true);
-                }}
-                style={{
-                  padding: '10px 16px',
-                  background: '#17a2b8',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
-                View Schedule
-              </button>
-              <button
-                onClick={() => setShowRepayment(true)}
-                style={{
-                  padding: '10px 16px',
-                  background: '#ffc107',
-                  color: '#212529',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
-                Record Repayment
-              </button>
-            </>
-          )}
-
-          <div style={{ flex: 1 }} />
-          <div style={{ fontSize: '12px', color: '#666', alignSelf: 'center' }}>
-            {context.recovery_notes_placeholder?.note}
-          </div>
-        </div>
-      </div>
-
-      {/* Loan History */}
-      <div style={{ marginTop: '16px', background: '#fff', border: '1px solid #ddd', borderRadius: '4px', padding: '20px' }}>
-        <h2 style={{ marginTop: 0 }}>Loan History</h2>
-        {context.loan_history.length === 0 ? (
-          <div style={{ color: '#666' }}>No loans found for this client.</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #eee' }}>
-            <thead>
-              <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #eee' }}>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Loan ID</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Principal</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Total Due</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Outstanding</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Risk</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {context.loan_history.map((l) => (
-                <tr key={l.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px' }}>{l.id}</td>
-                  <td style={{ padding: '10px' }}>{l.status}</td>
-                  <td style={{ padding: '10px' }}>{l.principal_amount}</td>
-                  <td style={{ padding: '10px' }}>{l.total_amount_due}</td>
-                  <td style={{ padding: '10px' }}>{l.outstanding_amount}</td>
-                  <td style={{ padding: '10px' }}>
-                    {l.risk_label}
-                    {l.max_days_overdue > 0 ? ` (${l.max_days_overdue}d)` : ''}
-                  </td>
-                  <td style={{ padding: '10px' }}>{new Date(l.created_at).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Create Loan Modal */}
-      {showCreateLoan && (
-        <CreateLoanModal
-          clientId={client.id}
-          onClose={() => setShowCreateLoan(false)}
-          onSuccess={async () => {
-            setShowCreateLoan(false);
-            await refreshContext();
-          }}
-        />
-      )}
-
-      {/* Loan Details Modal */}
-      {showLoanDetails && (
-        <ModalShell title={`Loan Details (ID ${activeLoanId})`} onClose={() => setShowLoanDetails(false)} width={920}>
-          {!loanDetails ? (
-            <div>Loading...</div>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>Principal</div>
-                  <div style={{ fontWeight: 'bold' }}>{loanDetails.principal_amount}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>Interest Rate</div>
-                  <div style={{ fontWeight: 'bold' }}>{loanDetails.interest_rate}%</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>Installments</div>
-                  <div style={{ fontWeight: 'bold' }}>{loanDetails.number_of_installments}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>Totals</div>
-                  <div style={{ fontSize: '12px' }}>
-                    Total due: <strong>{loanDetails.total_amount_due}</strong>
-                    <br />
-                    Paid: <strong>{loanDetails.total_paid}</strong> | Outstanding:{' '}
-                    <strong>{loanDetails.outstanding_amount}</strong>
-                  </div>
-                </div>
+            {/* KYC Documents */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <h2 style={styles.cardTitle}>KYC Documents</h2>
+                <span style={styles.pill}>{kycDocs.length} file(s)</span>
               </div>
-              <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>
-                Risk: <strong>{loanDetails.risk?.label}</strong>
-                {loanDetails.risk?.max_days_overdue ? ` (max ${loanDetails.risk.max_days_overdue} days overdue)` : ''}
-              </div>
-              <div style={{ borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                <strong>Recent repayments</strong>
-                {loanDetails.repayments?.length ? (
-                  <ul>
-                    {loanDetails.repayments.slice(0, 5).map((r) => (
-                      <li key={r.id}>
-                        {r.payment_date}: {r.amount_paid} (by {r.recorded_by_username})
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div style={{ color: '#666' }}>No repayments yet.</div>
-                )}
-              </div>
-            </>
-          )}
-        </ModalShell>
-      )}
 
-      {/* Schedule Modal */}
-      {showSchedule && (
-        <ModalShell title={`Repayment Schedule (Loan ${activeLoanId})`} onClose={() => setShowSchedule(false)} width={980}>
-          {!schedule ? (
-            <div>Loading...</div>
-          ) : (
-            <>
-              <div style={{ marginBottom: '10px', color: '#666', fontSize: '12px' }}>
-                Risk: <strong>{schedule.risk?.label}</strong>
-                {schedule.risk?.max_days_overdue ? ` (max ${schedule.risk.max_days_overdue} days overdue)` : ''}
-                <br />
-                Total due: <strong>{schedule.total_amount_due}</strong> | Paid:{' '}
-                <strong>{schedule.total_paid}</strong> | Outstanding:{' '}
-                <strong>{schedule.outstanding_amount}</strong>
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #eee' }}>
-                <thead>
-                  <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #eee' }}>
-                    <th style={{ textAlign: 'left', padding: '10px' }}>#</th>
-                    <th style={{ textAlign: 'left', padding: '10px' }}>Due Date</th>
-                    <th style={{ textAlign: 'left', padding: '10px' }}>Amount Due</th>
-                    <th style={{ textAlign: 'left', padding: '10px' }}>Amount Paid</th>
-                    <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
-                    <th style={{ textAlign: 'left', padding: '10px' }}>Days Overdue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.installments.map((i) => (
-                    <tr key={i.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px' }}>{i.installment_number}</td>
-                      <td style={{ padding: '10px' }}>{i.due_date}</td>
-                      <td style={{ padding: '10px' }}>{i.amount_due}</td>
-                      <td style={{ padding: '10px' }}>{i.amount_paid}</td>
-                      <td style={{ padding: '10px' }}>{i.status}</td>
-                      <td style={{ padding: '10px' }}>{i.days_overdue}</td>
+              {kycDocs.length === 0 ? (
+                <div style={styles.empty}>No KYC documents found for this client.</div>
+              ) : (
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Type</th>
+                      <th style={styles.th}>Uploaded</th>
+                      <th style={styles.th}>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-        </ModalShell>
-      )}
+                  </thead>
+                  <tbody>
+                    {kycDocs.map((doc) => (
+                      <tr key={doc.id}>
+                        <td style={styles.td}>{doc.document_type || "—"}</td>
+                        <td style={styles.td}>
+                          {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : "—"}
+                        </td>
+                        <td style={styles.td}>
+                          {doc.file_url ? (
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={styles.link}
+                            >
+                              View
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
 
-      {/* Repayment Modal */}
-      {showRepayment && context.active_loan && (
-        <RecordRepaymentModal
-          loanId={context.active_loan.id}
-          onClose={() => setShowRepayment(false)}
-          onSuccess={async () => {
-            setShowRepayment(false);
-            await refreshContext();
-            // refresh schedule/details if open later
-            setSchedule(null);
-            setLoanDetails(null);
-          }}
-        />
-      )}
+            {/* Loan Overview */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <h2 style={styles.cardTitle}>Loan Overview</h2>
+                {activeLoan ? statusPill(activeLoan.status) : <span style={styles.pill}>No Active Loan</span>}
+              </div>
+
+              {!activeLoan ? (
+                <div style={styles.empty}>
+                  No active loan for this client yet. You can create one from the right panel.
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div style={styles.infoRow}>
+                      <div style={styles.label}>Product</div>
+                      <div style={styles.value}>
+                        {activeLoan.product_name || activeLoan.product?.name || "—"}
+                      </div>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <div style={styles.label}>Amount</div>
+                      <div style={styles.value}>{activeLoan.amount ?? "—"}</div>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <div style={styles.label}>Interest Rate</div>
+                      <div style={styles.value}>
+                        {activeLoan.interest_rate != null ? `${activeLoan.interest_rate}%` : "—"}
+                      </div>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <div style={styles.label}>Term (Months)</div>
+                      <div style={styles.value}>{activeLoan.term_months ?? "—"}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 14 }}>
+                    <h3 style={styles.sectionTitle}>Loan Documents</h3>
+
+                    {loanDocs.length === 0 ? (
+                      <div style={styles.empty}>No loan documents uploaded yet.</div>
+                    ) : (
+                      <table style={styles.table}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>Type</th>
+                            <th style={styles.th}>Label</th>
+                            <th style={styles.th}>Uploaded</th>
+                            <th style={styles.th}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {loanDocs.map((doc) => (
+                            <tr key={doc.id}>
+                              <td style={styles.td}>{doc.document_type || "—"}</td>
+                              <td style={styles.td}>{doc.label || "—"}</td>
+                              <td style={styles.td}>
+                                {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : "—"}
+                              </td>
+                              <td style={styles.td}>
+                                {doc.file_url ? (
+                                  <a
+                                    href={doc.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={styles.link}
+                                  >
+                                    View
+                                  </a>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT: Actions */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <h2 style={styles.cardTitle}>Actions</h2>
+                <span style={styles.pill}>Loan Officer</span>
+              </div>
+
+              <div style={styles.actionsCol}>
+                <button
+                  style={{ ...styles.btn, ...styles.btnPrimary }}
+                  onClick={() => {
+                    setError(null);
+                    setShowCreateLoan((v) => !v);
+                    setShowUploadDoc(false);
+                    setShowRepayment(false);
+                  }}
+                >
+                  {showCreateLoan ? "Close Create Loan" : "Create Loan"}
+                </button>
+
+                <button
+                  style={{ ...styles.btn, ...(applicationLoan ? styles.btnMuted : { opacity: 0.55, cursor: "not-allowed" }) }}
+                  disabled={!applicationLoan}
+                  onClick={() => {
+                    setError(null);
+                    setShowUploadDoc((v) => !v);
+                    setShowCreateLoan(false);
+                    setShowRepayment(false);
+                  }}
+                >
+                  {showUploadDoc ? "Close Upload Document" : "Upload Loan Document"}
+                </button>
+
+                <button
+                  style={{ ...styles.btn, ...(activeLoan ? styles.btnMuted : { opacity: 0.55, cursor: "not-allowed" }) }}
+                  disabled={!activeLoan}
+                  onClick={() => {
+                    setError(null);
+                    setShowRepayment((v) => !v);
+                    setShowCreateLoan(false);
+                    setShowUploadDoc(false);
+                  }}
+                >
+                  {showRepayment ? "Close Repayment" : "Post Repayment"}
+                </button>
+
+                <button
+                  style={{
+                    ...styles.btn,
+                    ...(applicationLoan ? styles.btnDanger : { opacity: 0.55, cursor: "not-allowed" }),
+                  }}
+                  disabled={!applicationLoan}
+                  onClick={handleSubmitLoan}
+                >
+                  Submit Loan (Send to Branch Manager)
+                </button>
+              </div>
+
+              {/* Create Loan Form */}
+              {showCreateLoan && (
+                <form style={styles.form} onSubmit={handleCreateLoan}>
+                  <h3 style={styles.sectionTitle}>Create New Loan</h3>
+
+                  <div style={styles.fieldGrid}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Loan Product</label>
+                      <select
+                        style={styles.select}
+                        value={createFormData.product}
+                        onChange={(e) =>
+                          setCreateFormData((p) => ({ ...p, product: e.target.value }))
+                        }
+                        required
+                      >
+                        <option value="">Select a product</option>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Amount</label>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        step="0.01"
+                        value={createFormData.amount}
+                        onChange={(e) =>
+                          setCreateFormData((p) => ({ ...p, amount: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Term (Months)</label>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        value={createFormData.term_months}
+                        onChange={(e) =>
+                          setCreateFormData((p) => ({ ...p, term_months: e.target.value }))
+                        }
+                        required
+                      />
+                      <span style={styles.small}>
+                        Tip: Use the product’s standard term unless otherwise instructed.
+                      </span>
+                    </div>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Purpose (Optional)</label>
+                      <textarea
+                        style={styles.textarea}
+                        value={createFormData.purpose}
+                        onChange={(e) =>
+                          setCreateFormData((p) => ({ ...p, purpose: e.target.value }))
+                        }
+                        placeholder="Reason or purpose for the loan"
+                      />
+                    </div>                  </div>
+
+                  <div style={styles.formActions}>
+                    <button type="button" style={styles.inlineBtn} onClick={() => setShowCreateLoan(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" style={{ ...styles.inlineBtn, ...styles.btnPrimary }}>
+                      Create
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Upload Document Form */}
+              {showUploadDoc && (
+                <form style={styles.form} onSubmit={handleUploadDocument}>
+                  <h3 style={styles.sectionTitle}>Upload Loan Document</h3>
+
+                  <div style={styles.fieldGrid}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Document Type</label>
+                      <input
+                        style={styles.input}
+                        value={uploadFormData.document_type}
+                        onChange={(e) =>
+                          setUploadFormData((p) => ({ ...p, document_type: e.target.value }))
+                        }
+                        placeholder="e.g. NATIONAL_ID, PAYSLIP, GUARANTOR"
+                        required
+                      />
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Label</label>
+                      <input
+                        style={styles.input}
+                        value={uploadFormData.label}
+                        onChange={(e) =>
+                          setUploadFormData((p) => ({ ...p, label: e.target.value }))
+                        }
+                        placeholder="Short title (optional)"
+                      />
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>File</label>
+                      <input
+                        style={styles.input}
+                        type="file"
+                        onChange={(e) =>
+                          setUploadFormData((p) => ({ ...p, document_file: e.target.files?.[0] || null }))
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Description</label>
+                      <textarea
+                        style={styles.textarea}
+                        value={uploadFormData.description}
+                        onChange={(e) =>
+                          setUploadFormData((p) => ({ ...p, description: e.target.value }))
+                        }
+                        placeholder="Optional notes about this document"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.formActions}>
+                    <button type="button" style={styles.inlineBtn} onClick={() => setShowUploadDoc(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" style={{ ...styles.inlineBtn, ...styles.btnPrimary }}>
+                      Upload
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Repayment Form */}
+              {showRepayment && (
+                <form style={styles.form} onSubmit={handlePostRepayment}>
+                  <h3 style={styles.sectionTitle}>Post Repayment</h3>
+
+                  <div style={styles.fieldGrid}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Amount</label>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        step="0.01"
+                        value={repaymentFormData.amount}
+                        onChange={(e) =>
+                          setRepaymentFormData((p) => ({ ...p, amount: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Payment Method</label>
+                      <select
+                        style={styles.select}
+                        value={repaymentFormData.payment_method}
+                        onChange={(e) =>
+                          setRepaymentFormData((p) => ({ ...p, payment_method: e.target.value }))
+                        }
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="MOBILE_MONEY">Mobile Money</option>
+                        <option value="CHEQUE">Cheque</option>
+                      </select>
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Reference</label>
+                      <input
+                        style={styles.input}
+                        value={repaymentFormData.payment_reference}
+                        onChange={(e) =>
+                          setRepaymentFormData((p) => ({ ...p, payment_reference: e.target.value }))
+                        }
+                        placeholder="Optional transaction reference"
+                      />
+                    </div>
+
+                    <div style={styles.field}>
+                      <label style={styles.label}>Notes</label>
+                      <textarea
+                        style={styles.textarea}
+                        value={repaymentFormData.notes}
+                        onChange={(e) =>
+                          setRepaymentFormData((p) => ({ ...p, notes: e.target.value }))
+                        }
+                        placeholder="Optional notes"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.formActions}>
+                    <button type="button" style={styles.inlineBtn} onClick={() => setShowRepayment(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" style={{ ...styles.inlineBtn, ...styles.btnPrimary }}>
+                      Post Repayment
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Loan History */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <h2 style={styles.cardTitle}>Loan History</h2>
+                <span style={styles.pill}>{loans.length} record(s)</span>
+              </div>
+
+              {loans.length === 0 ? (
+                <div style={styles.empty}>No previous loans recorded for this client.</div>
+              ) : (
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Status</th>
+                      <th style={styles.th}>Amount</th>
+                      <th style={styles.th}>Term</th>
+                      <th style={styles.th}>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loans.map((l) => (
+                      <tr key={l.id}>
+                        <td style={styles.td}>{statusPill(l.status)}</td>
+                        <td style={styles.td}>{l.amount ?? "—"}</td>
+                        <td style={styles.td}>{l.term_months ?? "—"}</td>
+                        <td style={styles.td}>
+                          {l.created_at ? new Date(l.created_at).toLocaleDateString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              <div style={{ marginTop: 10 }}>
+                <button style={styles.inlineBtn} onClick={() => reloadContext()}>
+                  Refresh Data
+                </button>
+                <span style={{ marginLeft: 10, ...styles.small }}>
+                  If another user updated this client, refresh to see changes.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ height: 18 }} />
+      </div>
     </div>
   );
 };
 
-const CreateLoanModal = ({ clientId, onClose, onSuccess }) => {
-  const [principalAmount, setPrincipalAmount] = useState('');
-  const [interestRate, setInterestRate] = useState('10.00');
-  const [installments, setInstallments] = useState('12');
-  const [frequency, setFrequency] = useState('MONTHLY');
-  const [disbursementDate, setDisbursementDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [firstDueDate, setFirstDueDate] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    if (!principalAmount) return setError('Principal amount is required.');
-    if (!firstDueDate) return setError('First due date is required.');
-    setSaving(true);
-    try {
-      await createLoan({
-        client_id: Number(clientId),
-        principal_amount: principalAmount,
-        interest_rate: interestRate,
-        number_of_installments: Number(installments),
-        repayment_frequency: frequency,
-        disbursement_date: disbursementDate,
-        first_due_date: firstDueDate,
-      });
-      await onSuccess();
-    } catch (e2) {
-      setError(e2?.response?.data?.detail || 'Failed to create loan.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <ModalShell title="Create Loan" onClose={onClose}>
-      {error && (
-        <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', color: '#721c24', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
-          {error}
-        </div>
-      )}
-      <form onSubmit={submit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Principal Amount *</label>
-            <input value={principalAmount} onChange={(e) => setPrincipalAmount(e.target.value)} type="number" step="0.01" min="0" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Interest Rate (%)</label>
-            <input value={interestRate} onChange={(e) => setInterestRate(e.target.value)} type="number" step="0.01" min="0" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}># Installments *</label>
-            <input value={installments} onChange={(e) => setInstallments(e.target.value)} type="number" min="1" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Repayment Frequency *</label>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
-              <option value="WEEKLY">Weekly</option>
-              <option value="MONTHLY">Monthly</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Disbursement Date *</label>
-            <input value={disbursementDate} onChange={(e) => setDisbursementDate(e.target.value)} type="date" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>First Due Date *</label>
-            <input value={firstDueDate} onChange={(e) => setFirstDueDate(e.target.value)} type="date" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-        </div>
-        <div style={{ marginTop: '14px', display: 'flex', gap: '10px' }}>
-          <button type="submit" disabled={saving} style={{ padding: '10px 16px', background: saving ? '#6c757d' : '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
-            {saving ? 'Creating...' : 'Create Loan'}
-          </button>
-          <button type="button" onClick={onClose} disabled={saving} style={{ padding: '10px 16px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            Cancel
-          </button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-};
-
-const RecordRepaymentModal = ({ loanId, onClose, onSuccess }) => {
-  const [amount, setAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    if (!amount) return setError('Amount is required.');
-    setSaving(true);
-    try {
-      await recordRepayment(loanId, { amount, payment_date: paymentDate, note: note || null });
-      await onSuccess();
-    } catch (e2) {
-      setError(e2?.response?.data?.detail || 'Failed to record repayment.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <ModalShell title={`Record Repayment (Loan ${loanId})`} onClose={onClose}>
-      {error && (
-        <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', color: '#721c24', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
-          {error}
-        </div>
-      )}
-      <form onSubmit={submit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Amount *</label>
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" step="0.01" min="0" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Payment Date *</label>
-            <input value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} type="date" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div style={{ gridColumn: '1 / span 2' }}>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Note / Reference (optional)</label>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-        </div>
-        <div style={{ marginTop: '14px', display: 'flex', gap: '10px' }}>
-          <button type="submit" disabled={saving} style={{ padding: '10px 16px', background: saving ? '#6c757d' : '#ffc107', color: '#212529', border: 'none', borderRadius: '4px', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
-            {saving ? 'Recording...' : 'Record Repayment'}
-          </button>
-          <button type="button" onClick={onClose} disabled={saving} style={{ padding: '10px 16px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            Cancel
-          </button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-};
-
+export default LoanOfficerClientLoanContextPage;

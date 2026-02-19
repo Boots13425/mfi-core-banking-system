@@ -46,7 +46,7 @@ def send_invite_email(user):
         "Please click the link below to set your password and activate your account:\n\n"
         f"{invite_link}\n\n"
         "If you did not expect this invitation, you can ignore this email.\n\n"
-        "Regards,\nETS NTECH"
+        "Regards,\nMFI TEAM"
     )
 
     # Build a valid From header. Avoid dots in the display name (e.g., "ETS.NTECH") to prevent parsing errors.
@@ -55,7 +55,7 @@ def send_invite_email(user):
         # Final fallback (should not happen if your .env is correct)
         from_addr = "no-reply@localhost"
 
-    from_email = formataddr(("ETS NTECH", from_addr))
+    from_email = formataddr(("MFI TEAM", from_addr))
 
     send_mail(
         subject=subject,

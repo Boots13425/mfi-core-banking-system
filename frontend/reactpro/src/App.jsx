@@ -13,8 +13,14 @@ import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { ClientListPage } from './pages/ClientListPage';
 import { ClientRegistrationPage } from './pages/ClientRegistrationPage';
 import { ClientProfilePage } from './pages/ClientProfilePage';
-import { LoanOfficerClientsPage } from './pages/LoanOfficerClientsPage';
-import { LoanOfficerClientLoanContextPage } from './pages/LoanOfficerClientLoanContextPage';
+
+import LoanOfficerClientsPage from './pages/LoanOfficerClientsPage';
+import LoanOfficerClientLoanContextPage from './pages/LoanOfficerClientLoanContextPage';
+import BranchManagerLoanQueuePage from './pages/BranchManagerLoanQueuePage';
+import BranchManagerLoanDetailPage from './pages/BranchManagerLoanDetailPage';
+import CashierLoanQueuePage from './pages/CashierLoanQueuePage';
+import CashierDisbursementPage from './pages/CashierDisbursementPage';
+
 import axiosInstance from './api/axios';
 
 const SuperAdminPanel = () => {
@@ -104,7 +110,6 @@ const AppRoutes = () => {
         .catch(() => {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          // Optional: send user to login immediately if token is invalid
           navigate('/login', { replace: true });
         });
     }
@@ -201,12 +206,26 @@ const AppRoutes = () => {
         }
       />
 
+      {/* =========================
+          LOAN OFFICER ROUTES
+         ========================= */}
       <Route
         path="/loan-officer/clients"
         element={
           <RequireAuth>
             <RequireRole role="LOAN_OFFICER">
               <LoanOfficerClientsPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/loan-officer/clients/:clientId/loan-context"
+        element={
+          <RequireAuth>
+            <RequireRole role="LOAN_OFFICER">
+              <LoanOfficerClientLoanContextPage />
             </RequireRole>
           </RequireAuth>
         }
@@ -222,6 +241,67 @@ const AppRoutes = () => {
           </RequireAuth>
         }
       />
+
+      {/* =========================
+          BRANCH MANAGER ROUTES
+         ========================= */}
+
+      {/* ✅ FIX: this route was missing, so your "Loans(All)" button hit a dead route */}
+      <Route
+        path="/branch-manager/loans"
+        element={
+          <RequireAuth>
+            <RequireRole role="BRANCH_MANAGER">
+              <BranchManagerLoanQueuePage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/branch-manager/loan-queue"
+        element={
+          <RequireAuth>
+            <RequireRole role="BRANCH_MANAGER">
+              <BranchManagerLoanQueuePage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/branch-manager/loans/:loanId"
+        element={
+          <RequireAuth>
+            <RequireRole role="BRANCH_MANAGER">
+              <BranchManagerLoanDetailPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
+        {/* Cashier routes */}
+  <Route
+    path="/cashier/loans"
+    element={
+      <RequireAuth>
+          <RequireRole role="CASHIER">
+          <CashierLoanQueuePage />
+        </RequireRole>
+      </RequireAuth>
+    }
+  />
+  
+  <Route
+    path="/cashier/loans/:loanId/disburse"
+    element={
+      <RequireAuth>
+          <RequireRole role="CASHIER">
+          <CashierDisbursementPage />
+        </RequireRole>
+      </RequireAuth>
+    }
+  />
 
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
