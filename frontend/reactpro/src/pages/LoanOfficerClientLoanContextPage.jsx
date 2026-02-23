@@ -6,6 +6,7 @@ import {
   getLoanProducts,
   createLoan,
   uploadLoanDocument,
+  uploadLoanDocumentsBulk,
   submitLoan,
   postRepayment,
 } from "../api/loans";
@@ -38,6 +39,8 @@ const LoanOfficerClientLoanContextPage = () => {
     label: "",
     description: "",
   });
+
+  const [requiredUploadFiles, setRequiredUploadFiles] = useState({});
 
   const [repaymentFormData, setRepaymentFormData] = useState({
     amount: "",
@@ -350,13 +353,13 @@ const LoanOfficerClientLoanContextPage = () => {
       setError("Please select a file");
       return;
     }
-    if (!context?.active_loan) {
-      setError("No active loan found");
+    if (!context?.application_loan) {
+      setError("No application loan found");
       return;
     }
 
     try {
-      await uploadLoanDocument(context.active_loan.id, uploadFormData);
+      await uploadLoanDocument(context.application_loan.id, uploadFormData);
       setShowUploadDoc(false);
       setUploadFormData({ document_type: "", document_file: null, label: "", description: "" });
       await reloadContext();
@@ -365,14 +368,52 @@ const LoanOfficerClientLoanContextPage = () => {
     }
   };
 
-  const handleSubmitLoan = async () => {
-    if (!context?.active_loan) {
-      setError("No active loan found");
+  const handleUploadAllDocuments = async () => {
+    if (!applicationLoan) {
+      setError("No application loan found");
+      return;
+    }
+
+    const selectedDocIds = Object.keys(requiredUploadFiles).filter(
+      (id) => requiredUploadFiles[id]
+    );
+
+    if (selectedDocIds.length === 0) {
+      setError("Please select at least one file to upload");
       return;
     }
 
     try {
-      await submitLoan(context.active_loan.id);
+      const formData = new FormData();
+      selectedDocIds.forEach((docId) => {
+        formData.append(`file_${docId}`, requiredUploadFiles[docId]);
+      });
+
+      const response = await uploadLoanDocumentsBulk(applicationLoan.id, formData);
+
+      if (response.errors && response.errors.length > 0) {
+        setError(`Bulk upload completed with errors: ${response.errors.join(", ")}`);
+      }
+
+      setRequiredUploadFiles({});
+      await reloadContext();
+
+      if (!response.errors || response.errors.length === 0) {
+        alert("Documents uploaded successfully");
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to upload documents");
+    }
+  };
+
+  const handleSubmitLoan = async () => {
+    if (!context?.application_loan) {
+      setError("No application loan found");
+      return;
+    }
+
+    try {
+      await submitLoan(context.application_loan.id);
       await reloadContext();
       alert("Loan submitted successfully");
     } catch (err) {
@@ -429,9 +470,11 @@ const LoanOfficerClientLoanContextPage = () => {
   const activeLoan = context?.active_loan;
   const applicationLoan = context?.application_loan;
   const loans = context?.loans || [];
-  const loanDocs = context?.loan_documents || [];
+  const hasDraft = loans.some((l) => l.status === 'DRAFT');
+  const loanDocs = context?.uploaded_documents || [];
   const kycDocs = context?.kyc_documents || [];
   const kycStatus = context?.kyc_status;
+  const hasMissingDocs = context?.missing_documents && context.missing_documents.length > 0;
 
   return (
     <div style={styles.page}>
@@ -588,7 +631,7 @@ const LoanOfficerClientLoanContextPage = () => {
                         <tbody>
                           {loanDocs.map((doc) => (
                             <tr key={doc.id}>
-                              <td style={styles.td}>{doc.document_type || "—"}</td>
+                              <td style={styles.td}>{doc.document_type_name || "—"}</td>
                               <td style={styles.td}>{doc.label || "—"}</td>
                               <td style={styles.td}>
                                 {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : "—"}
@@ -628,8 +671,10 @@ const LoanOfficerClientLoanContextPage = () => {
 
               <div style={styles.actionsCol}>
                 <button
-                  style={{ ...styles.btn, ...styles.btnPrimary }}
+                  style={{ ...styles.btn, ...styles.btnPrimary, ...(hasDraft ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  disabled={hasDraft}
                   onClick={() => {
+                    if (hasDraft) return;
                     setError(null);
                     setShowCreateLoan((v) => !v);
                     setShowUploadDoc(false);
@@ -665,16 +710,24 @@ const LoanOfficerClientLoanContextPage = () => {
                   {showRepayment ? "Close Repayment" : "Post Repayment"}
                 </button>
 
-                <button
-                  style={{
-                    ...styles.btn,
-                    ...(applicationLoan ? styles.btnDanger : { opacity: 0.55, cursor: "not-allowed" }),
-                  }}
-                  disabled={!applicationLoan}
-                  onClick={handleSubmitLoan}
-                >
-                  Submit Loan (Send to Branch Manager)
-                </button>
+                <div>
+                  <button
+                    style={{
+                      ...styles.btn,
+                      ...(applicationLoan && !hasMissingDocs ? styles.btnDanger : { opacity: 0.55, cursor: "not-allowed" }),
+                    }}
+                    disabled={!applicationLoan || hasMissingDocs}
+                    onClick={handleSubmitLoan}
+                  >
+                    Submit Loan (Send to Branch Manager)
+                  </button>
+
+                  {hasMissingDocs && (
+                    <div style={{ marginTop: 8 }}>
+                      <span style={styles.small}>Upload all required documents before submitting.</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Create Loan Form */}
@@ -754,71 +807,72 @@ const LoanOfficerClientLoanContextPage = () => {
                 </form>
               )}
 
-              {/* Upload Document Form */}
+              {/* Upload Document Form (Product-required documents) */}
               {showUploadDoc && (
-                <form style={styles.form} onSubmit={handleUploadDocument}>
-                  <h3 style={styles.sectionTitle}>Upload Loan Document</h3>
+                <div style={styles.form}>
+                  <h3 style={styles.sectionTitle}>Required Loan Documents</h3>
 
-                  <div style={styles.fieldGrid}>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Document Type</label>
-                      <input
-                        style={styles.input}
-                        value={uploadFormData.document_type}
-                        onChange={(e) =>
-                          setUploadFormData((p) => ({ ...p, document_type: e.target.value }))
-                        }
-                        placeholder="e.g. NATIONAL_ID, PAYSLIP, GUARANTOR"
-                        required
-                      />
-                    </div>
+                  {(!context?.required_documents || context.required_documents.length === 0) ? (
+                    <div style={styles.empty}>No product-required documents configured for this loan product.</div>
+                  ) : (
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>Document</th>
+                          <th style={styles.th}>Status</th>
+                          <th style={styles.th}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {context.required_documents.map((req) => {
+                          const uploaded = loanDocs.find((d) => d.document_type_id === req.id);
+                          return (
+                            <tr key={req.id}>
+                              <td style={styles.td}>{req.name || req.code || '—'}</td>
+                              <td style={styles.td}>
+                                <span style={{ ...styles.pill, borderColor: uploaded ? '#c3e6cb' : '#ddd', background: uploaded ? '#d4edda' : '#fafafa' }}>
+                                  {uploaded ? 'Uploaded' : 'Missing'}
+                                </span>
+                              </td>
+                              <td style={styles.td}>
+                                {uploaded ? (
+                                  <a href={uploaded.file_url} target="_blank" rel="noreferrer" style={styles.link}>
+                                    View
+                                  </a>
+                                ) : (
+                                  <input
+                                    type="file"
+                                    style={styles.input}
+                                    onChange={(e) =>
+                                      setRequiredUploadFiles((p) => ({ ...p, [req.id]: e.target.files?.[0] || null }))
+                                    }
+                                  />
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
 
-                    <div style={styles.field}>
-                      <label style={styles.label}>Label</label>
-                      <input
-                        style={styles.input}
-                        value={uploadFormData.label}
-                        onChange={(e) =>
-                          setUploadFormData((p) => ({ ...p, label: e.target.value }))
-                        }
-                        placeholder="Short title (optional)"
-                      />
-                    </div>
-
-                    <div style={styles.field}>
-                      <label style={styles.label}>File</label>
-                      <input
-                        style={styles.input}
-                        type="file"
-                        onChange={(e) =>
-                          setUploadFormData((p) => ({ ...p, document_file: e.target.files?.[0] || null }))
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div style={styles.field}>
-                      <label style={styles.label}>Description</label>
-                      <textarea
-                        style={styles.textarea}
-                        value={uploadFormData.description}
-                        onChange={(e) =>
-                          setUploadFormData((p) => ({ ...p, description: e.target.value }))
-                        }
-                        placeholder="Optional notes about this document"
-                      />
-                    </div>
-                  </div>
-
-                  <div style={styles.formActions}>
+                  <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button 
+                      type="button" 
+                      style={{ ...styles.inlineBtn, ...styles.btnPrimary }}
+                      onClick={handleUploadAllDocuments}
+                      disabled={!applicationLoan || Object.values(requiredUploadFiles).every(f => !f)}
+                    >
+                      Upload All Documents
+                    </button>
                     <button type="button" style={styles.inlineBtn} onClick={() => setShowUploadDoc(false)}>
-                      Cancel
+                      Close
                     </button>
-                    <button type="submit" style={{ ...styles.inlineBtn, ...styles.btnPrimary }}>
-                      Upload
-                    </button>
+                    <span style={{ ...styles.small }}>
+                      Uploads target the draft application loan.
+                    </span>
                   </div>
-                </form>
+                </div>
               )}
 
               {/* Repayment Form */}
@@ -908,6 +962,7 @@ const LoanOfficerClientLoanContextPage = () => {
                   <thead>
                     <tr>
                       <th style={styles.th}>Status</th>
+                      <th style={styles.th}>Product</th>
                       <th style={styles.th}>Amount</th>
                       <th style={styles.th}>Term</th>
                       <th style={styles.th}>Created</th>
@@ -917,6 +972,7 @@ const LoanOfficerClientLoanContextPage = () => {
                     {loans.map((l) => (
                       <tr key={l.id}>
                         <td style={styles.td}>{statusPill(l.status)}</td>
+                        <td style={styles.td}>{l.product_name ?? "—"}</td>
                         <td style={styles.td}>{l.amount ?? "—"}</td>
                         <td style={styles.td}>{l.term_months ?? "—"}</td>
                         <td style={styles.td}>

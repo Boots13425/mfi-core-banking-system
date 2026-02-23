@@ -68,6 +68,19 @@ export const uploadLoanDocument = async (loanId, documentData) => {
   return response.data;
 };
 
+export const uploadLoanDocumentsBulk = async (loanId, formData) => {
+  const response = await axiosInstance.post(
+    `/loans/${loanId}/upload_documents_bulk/`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return response.data;
+};
+
 export const getLoanDocuments = async (loanId) => {
   const response = await axiosInstance.get(`/loans/${loanId}/get_documents/`);
   return response.data;
@@ -139,6 +152,7 @@ export default {
   updateLoan,
   submitLoan,
   uploadLoanDocument,
+  uploadLoanDocumentsBulk,
   getLoanDocuments,
   getLoanSchedule,
   postRepayment,

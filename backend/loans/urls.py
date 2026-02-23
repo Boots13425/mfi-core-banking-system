@@ -18,7 +18,7 @@ urlpatterns = [
     
     # Branch Manager endpoints
     path('branch-manager/loans/submitted/', BranchManagerLoanViewSet.as_view({'get': 'submitted'}), name='bm-submitted-loans'),
-    path('branch-manager/loans/<int:loan_id>/', BranchManagerLoanViewSet.as_view({'get': 'detail'}), name='bm-loan-detail'),
+    path('branch-manager/loans/<int:loan_id>/', BranchManagerLoanViewSet.as_view({'get': 'retrieve'}), name='bm-loan-detail'),
     path('branch-manager/loans/<int:loan_id>/approve/', BranchManagerLoanViewSet.as_view({'post': 'approve'}), name='bm-approve'),
     path('branch-manager/loans/<int:loan_id>/reject/', BranchManagerLoanViewSet.as_view({'post': 'reject'}), name='bm-reject'),
     path('branch-manager/loans/<int:loan_id>/request-changes/', BranchManagerLoanViewSet.as_view({'post': 'request_changes'}), name='bm-request-changes'),

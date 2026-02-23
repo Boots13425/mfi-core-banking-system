@@ -16,7 +16,7 @@ from .models import (
 from .serializers import (
     LoanProductSerializer, LoanProductDetailSerializer, LoanDocumentTypeSerializer,
     LoanDetailSerializer, LoanListSerializer, LoanCreateUpdateSerializer,
-    LoanDocumentUploadSerializer, LoanDisburseSerializer, RepaymentPostSerializer,
+    LoanDocumentUploadSerializer, LoanDocumentSerializer, LoanDisburseSerializer, RepaymentPostSerializer,
     PenaltyWaiverRequestSerializer
 )
 from .permissions import IsLoanOfficer, IsBranchManager, IsCashier
@@ -359,15 +359,30 @@ class LoanViewSet(viewsets.ModelViewSet):
         serializer = LoanDocumentUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        doc = serializer.save(
-            loan=loan,
-            uploaded_by=request.user
-        )
-        
-        return Response(
-            LoanDocumentSerializer(doc, context={'request': request}).data,
-            status=status.HTTP_201_CREATED
-        )
+        try:
+            doc = serializer.save(
+                loan=loan,
+                uploaded_by=request.user
+            )
+            
+            return Response(
+                LoanDocumentSerializer(doc, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as exc:
+            logger.error(f"Error uploading document for loan {loan.id}: {str(exc)}", exc_info=True)
+            
+            # Handle IntegrityError or other DB errors
+            if 'document_type' in str(exc).lower() or 'not null' in str(exc).lower():
+                return Response(
+                    {'error': 'Document type is required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            return Response(
+                {'error': 'Failed to upload document. Please try again.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     @action(detail=True, methods=['get'])
     def get_documents(self, request, pk=None):
@@ -376,6 +391,115 @@ class LoanViewSet(viewsets.ModelViewSet):
         documents = LoanDocument.objects.filter(loan=loan)
         serializer = LoanDocumentSerializer(documents, many=True, context={'request': request})
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def upload_documents_bulk(self, request, pk=None):
+        """POST /api/loans/<id>/upload_documents_bulk/ - Bulk upload multiple documents in one request.
+        
+        Expects multipart/form-data with files named: file_<document_type_id>
+        Example: file_1, file_2 where 1, 2 are LoanDocumentType IDs
+        
+        Uses atomic transaction: all-or-nothing. If any file fails, entire request rolls back.
+        """
+        from django.db import transaction
+        
+        loan = self.get_object()
+        
+        # Enforce: upload documents only on DRAFT or CHANGES_REQUESTED
+        if loan.status not in ['DRAFT', 'CHANGES_REQUESTED']:
+            return Response(
+                {'error': f'Cannot upload documents to loan in {loan.status} status. Only DRAFT or CHANGES_REQUESTED loans accept documents.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        files = request.FILES
+        if not files:
+            return Response(
+                {'error': 'No files provided.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # PRE-VALIDATE all file keys and document types BEFORE entering atomic transaction
+        files_to_upload = []
+        validation_errors = []
+        
+        for file_key in files:
+            # Extract document_type_id from file key (e.g., "file_1" -> "1")
+            if not file_key.startswith('file_'):
+                continue
+            
+            try:
+                doc_type_id = int(file_key.replace('file_', ''))
+                file_obj = files[file_key]
+                
+                # Validate document type exists
+                if not LoanDocumentType.objects.filter(id=doc_type_id).exists():
+                    validation_errors.append(f"Document type {doc_type_id} does not exist.")
+                    continue
+                
+                files_to_upload.append((doc_type_id, file_obj, file_key))
+                
+            except ValueError:
+                validation_errors.append(f"Invalid file key {file_key}: not a valid document type ID.")
+        
+        # Return validation errors if any
+        if validation_errors:
+            return Response(
+                {'error': 'Validation failed.', 'validation_errors': validation_errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not files_to_upload:
+            return Response(
+                {'error': 'No valid files to upload.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # ATOMIC TRANSACTION: Create all LoanDocument records all-or-nothing
+        uploaded_docs = []
+        
+        try:
+            with transaction.atomic():
+                for doc_type_id, file_obj, file_key in files_to_upload:
+                    # Create LoanDocument with document_type_id directly (no FK query)
+                    doc = LoanDocument.objects.create(
+                        loan=loan,
+                        document_type_id=doc_type_id,
+                        document_file=file_obj,
+                        uploaded_by=request.user
+                    )
+                    
+                    uploaded_docs.append(
+                        LoanDocumentSerializer(doc, context={'request': request}).data
+                    )
+        
+        except Exception as exc:
+            logger.error(f"Transaction error in bulk upload for loan {loan.id}: {str(exc)}", exc_info=True)
+            return Response(
+                {'error': 'Bulk upload failed. Please ensure all files are valid and try again.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate and return missing documents
+        required_docs = LoanProductRequiredDocument.objects.filter(
+            product=loan.product
+        ).values_list('document_type_id', flat=True)
+        
+        uploaded_doc_types = LoanDocument.objects.filter(
+            loan=loan
+        ).values_list('document_type_id', flat=True)
+        
+        missing_type_ids = set(required_docs) - set(uploaded_doc_types)
+        missing_docs = LoanDocumentType.objects.filter(id__in=missing_type_ids)
+        
+        response_data = {
+            'uploaded_documents': uploaded_docs,
+            'missing_documents': LoanDocumentTypeSerializer(
+                missing_docs, many=True, context={'request': request}
+            ).data,
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['get'])
     def get_schedule(self, request, pk=None):
@@ -546,8 +670,8 @@ class BranchManagerLoanViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'], url_path='(?P<loan_id>[^/.]+)')
-    def detail(self, request, loan_id=None):
-        """GET /api/branch-manager/loans/<id>/"""
+    def retrieve(self, request, loan_id=None):
+        """GET /api/branch-manager/loans/<id>/ - Retrieve specific loan details for branch manager."""
         if not loan_id:
             return Response({'error': 'Loan ID required'}, status=status.HTTP_400_BAD_REQUEST)
         

@@ -4,36 +4,27 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from loans.models import LoanProduct, LoanProductRequiredDocument
-
-# LoanDocumentType may or may not exist depending on your current schema
-try:
-    from loans.models import LoanDocumentType
-except Exception:
-    LoanDocumentType = None
+from loans.models import LoanProduct, LoanProductRequiredDocument, LoanDocumentType
 
 
 class Command(BaseCommand):
-    help = "Seed loan products and required documents (Cameroon context) safely across schema variants."
+    help = "Seed loan products and required documents (Cameroon context)."
 
     @transaction.atomic
     def handle(self, *args, **options):
         self.stdout.write("Seeding loan products and documents...")
 
-        # ---------------------------------------------------------------------
-        # 1) Define Cameroon-context loan doc codes (LOAN ONLY, not KYC)
-        # ---------------------------------------------------------------------
-        # Use document type codes that match LoanDocumentType.DOCUMENT_TYPES
-        # The first element of each pair is the code stored in the DB (and in the choices),
-        # the second element is a human-friendly description used for `description`.
+        # ------------------------------------------------------------
+        # 1) Canonical Loan Document Types (CODES MUST MATCH EVERYWHERE)
+        # ------------------------------------------------------------
         DOCS = [
             ("PAYSLIP", "Latest 2–3 months payslips / salary statement"),
             ("EMPLOYER_ATTESTATION", "Employer attestation (attestation de travail)"),
             ("BANK_STATEMENT", "Bank statement (last 3 months)"),
-            ("SALARY_DOMICILIATION", "Salary domiciliation / commitment letter (if applicable)"),
+            ("SALARY_DOMICILIATION", "Salary domiciliation / commitment letter"),
             ("BUSINESS_PROOF", "Proof of business activity (photos, receipts, lease, invoices)"),
-            ("TRADE_REGISTER", "RCCM / patente / business registration proof (if available)"),
-            ("CASHFLOW_SUMMARY", "Simple business cashflow summary (income/expenses)"),
+            ("TRADE_REGISTER", "RCCM / patente / business registration proof"),
+            ("CASHFLOW_SUMMARY", "Business cashflow summary (income/expenses)"),
             ("GUARANTOR_FORM", "Guarantor form / commitment"),
             ("EMERGENCY_JUSTIFICATION", "Emergency justification (hospital bill / school fees invoice / urgent quote)"),
             ("INCOME_PROOF", "Income proof (statement / payslip / cash-in history)"),
@@ -42,70 +33,42 @@ class Command(BaseCommand):
             ("SEASONAL_PLAN", "Season plan / expected harvest cashflow"),
             ("OTHER_LOAN_DOCUMENT", "Other supporting document (free upload)"),
         ]
+        docs_map = dict(DOCS)
 
-        # ---------------------------------------------------------------------
-        # 2) Create LoanDocumentType records ONLY if your schema has that model
-        #    (and DO NOT assume fields like is_active exist)
-        # ---------------------------------------------------------------------
-        doc_type_objects = {}  # code -> LoanDocumentType instance (if FK-based schema)
+        # ------------------------------------------------------------
+        # 2) Ensure LoanDocumentType rows exist for all DOCS
+        #    (Your model uses choices on `name`, so store the CODE in name.)
+        # ------------------------------------------------------------
+        doc_fields = {f.name for f in LoanDocumentType._meta.fields}
+        has_description = "description" in doc_fields
+        has_code = "code" in doc_fields  # just in case your model has it
 
-        if LoanDocumentType is not None:
-            doc_fields = {f.name for f in LoanDocumentType._meta.get_fields()}
+        doc_type_objects = {}  # code -> LoanDocumentType instance
+        for code, label in DOCS:
+            lookup = {"code": code} if has_code else {"name": code}
+            defaults = {}
+            if not has_code:
+                defaults["name"] = code
+            if has_description:
+                defaults["description"] = label
 
-            # Pick a stable lookup field
-            if "code" in doc_fields:
-                lookup_field = "code"
-            elif "name" in doc_fields:
-                lookup_field = "name"
-            else:
-                lookup_field = None
+            obj, _ = LoanDocumentType.objects.get_or_create(**lookup, defaults=defaults)
 
-            for code, label in DOCS:
-                if lookup_field is None:
-                    # Model exists but doesn't have code/name; we can't safely seed it.
-                    break
+            # Keep description updated if field exists
+            if has_description and obj.description != label:
+                obj.description = label
+                obj.save(update_fields=["description"])
 
-                lookup = {lookup_field: code}
+            # If your model has both code + name, keep both aligned
+            if has_code and getattr(obj, "name", None) != code and "name" in doc_fields:
+                obj.name = code
+                obj.save(update_fields=["name"])
 
-                defaults = {}
-                # Ensure `name` is set (it's NOT NULL and uses choices); set it to the code
-                if "name" in doc_fields:
-                    defaults["name"] = code
-                # Provide a description/label if the field exists
-                if "description" in doc_fields:
-                    defaults["description"] = label
-                if "label" in doc_fields:
-                    defaults["label"] = label
-                if "title" in doc_fields:
-                    defaults["title"] = label
+            doc_type_objects[code] = obj
 
-                # Use get_or_create with explicit defaults that satisfy NOT NULL constraints
-                obj, created = LoanDocumentType.objects.get_or_create(**lookup, defaults=defaults)
-
-                # If object exists but fields are out of date, sync them
-                changed = False
-                if "description" in doc_fields and getattr(obj, "description", None) != label:
-                    obj.description = label
-                    changed = True
-                if "label" in doc_fields and getattr(obj, "label", None) != label:
-                    obj.label = label
-                    changed = True
-                if "title" in doc_fields and getattr(obj, "title", None) != label:
-                    obj.title = label
-                    changed = True
-                # Ensure name stores the code (choices require this value)
-                if "name" in doc_fields and getattr(obj, "name", None) != code:
-                    obj.name = code
-                    changed = True
-
-                if changed:
-                    obj.save()
-
-                doc_type_objects[code] = obj
-
-        # ---------------------------------------------------------------------
-        # 3) Seed Loan Products (idempotent)
-        # ---------------------------------------------------------------------
+        # ------------------------------------------------------------
+        # 3) Loan Products (idempotent)
+        # ------------------------------------------------------------
         products = [
             {
                 "code": "SL",
@@ -149,124 +112,65 @@ class Command(BaseCommand):
             },
         ]
 
-        product_fields = {f.name for f in LoanProduct._meta.get_fields()}
-
+        product_fields = {f.name for f in LoanProduct._meta.fields}
         product_map = {}
         for p in products:
-            lookup = {}
-            if "code" in product_fields:
-                lookup = {"code": p["code"]}
-            else:
-                # fallback
-                lookup = {"name": p["name"]}
-
+            lookup = {"code": p["code"]} if "code" in product_fields else {"name": p["name"]}
             defaults = {k: v for k, v in p.items() if k in product_fields and k not in lookup}
             obj, _ = LoanProduct.objects.update_or_create(**lookup, defaults=defaults)
             product_map[p["code"]] = obj
 
-        # ---------------------------------------------------------------------
-        # 4) Required docs per product (Cameroon context)
-        # ---------------------------------------------------------------------
+        # ------------------------------------------------------------
+        # 4) Required docs per product (ONLY USE DOCS CODES ABOVE)
+        # ------------------------------------------------------------
         required = {
             "SL": [
-                ("PAYSLIP_OR_SALARY_STATEMENT", True),
+                ("PAYSLIP", True),
                 ("EMPLOYER_ATTESTATION", True),
                 ("BANK_STATEMENT", True),
-                ("COMMITMENT_LETTER", False),
+                ("SALARY_DOMICILIATION", False),
                 ("OTHER_LOAN_DOCUMENT", False),
             ],
             "BL": [
-                ("BUSINESS_ACTIVITY_PROOF", True),
-                ("BUSINESS_LICENSE_OR_TRADE_REGISTER", True),
+                ("BUSINESS_PROOF", True),
+                ("TRADE_REGISTER", True),
                 ("BANK_STATEMENT", True),
-                ("BUSINESS_CASHFLOW_SUMMARY", True),
+                ("CASHFLOW_SUMMARY", True),
                 ("GUARANTOR_FORM", True),
                 ("OTHER_LOAN_DOCUMENT", False),
             ],
             "EL": [
                 ("EMERGENCY_JUSTIFICATION", True),
-                ("INCOME_PROOF_LIGHT", True),
+                ("INCOME_PROOF", True),
                 ("GUARANTOR_FORM", True),
                 ("OTHER_LOAN_DOCUMENT", False),
             ],
             "AL": [
-                ("FARM_ACTIVITY_PROOF", True),
-                ("INPUTS_PROFORMA_INVOICE", True),
-                ("CASHFLOW_SEASON_PLAN", True),
+                ("FARM_PROOF", True),
+                ("PROFORMA_INVOICE", True),
+                ("SEASONAL_PLAN", True),
                 ("GUARANTOR_FORM", True),
                 ("OTHER_LOAN_DOCUMENT", False),
             ],
         }
 
-        req_fields = {f.name for f in LoanProductRequiredDocument._meta.get_fields()}
-
-        # Determine FK field to product on required doc model
-        if "loan_product" in req_fields:
-            product_fk_field = "loan_product"
-        elif "product" in req_fields:
-            product_fk_field = "product"
-        else:
-            raise Exception("Cannot find loan product FK on LoanProductRequiredDocument (expected loan_product or product).")
-
-        # Determine how document_type is stored (FK or CharField)
-        doc_type_field = LoanProductRequiredDocument._meta.get_field("document_type")
-        document_type_is_fk = getattr(doc_type_field, "is_relation", False)
-
-        # Rebuild required docs cleanly per product
+        # Rebuild required docs per product using FK-based schema
         for product_code, doc_list in required.items():
             product = product_map[product_code]
 
-            # Only update documents if document_type field is properly configured
-            try:
-                LoanProductRequiredDocument.objects.filter(**{product_fk_field: product}).delete()
+            # Clean existing requirements for this product
+            LoanProductRequiredDocument.objects.filter(product=product).delete()
 
-                for idx, (doc_code, mandatory) in enumerate(doc_list, start=1):
-                    defaults = {}
+            for doc_code, mandatory in doc_list:
+                doc_type = doc_type_objects.get(doc_code)
+                if not doc_type:
+                    raise Exception(f"Missing LoanDocumentType for code={doc_code}")
 
-                    # Optional metadata fields if present
-                    if "description" in req_fields:
-                        defaults["description"] = dict(DOCS).get(doc_code, doc_code)
-                    if "is_mandatory" in req_fields:
-                        defaults["is_mandatory"] = mandatory
-                    if "is_required" in req_fields:
-                        defaults["is_required"] = mandatory
-                    if "order" in req_fields:
-                        defaults["order"] = idx
-                    if "display_order" in req_fields:
-                        defaults["display_order"] = idx
-
-                    lookup = {product_fk_field: product}
-
-                    if document_type_is_fk:
-                        if LoanDocumentType is None:
-                            raise Exception("document_type is FK but LoanDocumentType model is not importable.")
-
-                        if doc_code not in doc_type_objects:
-                            # As a fallback, create doc type with minimal fields
-                            doc_fields = {f.name for f in LoanDocumentType._meta.get_fields()}
-                            if "code" in doc_fields:
-                                dt_lookup = {"code": doc_code}
-                            elif "name" in doc_fields:
-                                dt_lookup = {"name": doc_code}
-                            else:
-                                raise Exception("LoanDocumentType has no code/name field for lookup.")
-
-                            dt_defaults = {}
-                            if "description" in doc_fields:
-                                dt_defaults["description"] = dict(DOCS).get(doc_code, doc_code)
-
-                            dt, _ = LoanDocumentType.objects.get_or_create(**dt_lookup, defaults=dt_defaults)
-                            doc_type_objects[doc_code] = dt
-
-                        lookup["document_type"] = doc_type_objects[doc_code]
-                    else:
-                        lookup["document_type"] = doc_code
-
-                    LoanProductRequiredDocument.objects.update_or_create(**lookup, defaults=defaults)
-            except Exception as doc_error:
-                # If document linking fails, still succeed with product update
-                self.stdout.write(
-                    self.style.WARNING(f"  ! Could not seed document requirements for {product.name}: {str(doc_error)}")
+                # Create or update using FK fields only
+                LoanProductRequiredDocument.objects.update_or_create(
+                    product=product,
+                    document_type=doc_type,
+                    defaults={"is_mandatory": mandatory}
                 )
 
         self.stdout.write(self.style.SUCCESS("✓ Loan products seeded successfully!"))

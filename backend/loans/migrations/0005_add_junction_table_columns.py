@@ -4,7 +4,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('loans', '0004_add_missing_columns'),
+        ('loans', '0003_create_loandocumenttype'),
     ]
 
     operations = [

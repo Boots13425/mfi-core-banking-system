@@ -147,7 +147,7 @@ class Loan(models.Model):
 class LoanDocument(models.Model):
     """Documents uploaded for a specific loan."""
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE, related_name='documents')
-    document_type = models.ForeignKey(LoanDocumentType, on_delete=models.PROTECT, null=True, blank=True)
+    document_type = models.ForeignKey(LoanDocumentType, on_delete=models.PROTECT, null=False, blank=False)
     document_file = models.FileField(upload_to=loan_doc_upload_path)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -158,6 +158,7 @@ class LoanDocument(models.Model):
     
     class Meta:
         ordering = ['-uploaded_at']
+        unique_together = ('loan', 'document_type')
     
     def __str__(self):
         return f"{self.loan} - {self.document_type}"

@@ -7,6 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('loans', '0004_add_missing_columns'),
         ('loans', '0005_add_junction_table_columns'),
     ]
 

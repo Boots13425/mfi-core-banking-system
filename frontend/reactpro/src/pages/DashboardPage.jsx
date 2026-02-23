@@ -67,14 +67,13 @@ export const DashboardPage = () => {
             <button onClick={() => navigate('/branch-manager/loans')} style={cardBtn('#111')}>
               Loan Approvals
             </button>
-            <button onClick={() => navigate('/branch-manager/loan-queue')} style={cardBtn('#6c757d')}>
-              Loan Queue
-            </button>
           </>
         )}
 
           {user?.role === 'CASHIER' && (
-    <NavLink to="/cashier/loans">Disbursals</NavLink>
+            <button onClick={() => navigate('/cashier/loans')} style={cardBtn('#111')}>
+              Loan Approvals
+            </button>
   )}
       </div>
 

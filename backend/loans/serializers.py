@@ -208,6 +208,13 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
             )
             if active_loans.exists():
                 raise serializers.ValidationError("Client already has an active loan")
+            # Check for draft (or open application) loans - prevent multiple drafts
+            draft_loans = Loan.objects.filter(
+                client=client,
+                status__in=['DRAFT', 'CHANGES_REQUESTED']
+            )
+            if draft_loans.exists():
+                raise serializers.ValidationError("Client already has a draft loan in progress")
         return data
 
 
@@ -220,6 +227,10 @@ class LoanDocumentUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanDocument
         fields = ['document_type', 'document_file', 'label', 'description']
+        extra_kwargs = {
+            'document_type': {'required': True},
+            'document_file': {'required': True},
+        }
 
 
 class LoanApprovalSerializer(serializers.Serializer):
