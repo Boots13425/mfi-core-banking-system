@@ -38,6 +38,11 @@ export const updateLoan = async (loanId, loanData) => {
   return response.data;
 };
 
+export const listLoans = async () => {
+  const response = await axiosInstance.get('/loans/');
+  return response.data;
+};
+
 // LOAN SUBMISSION
 export const submitLoan = async (loanId) => {
   const response = await axiosInstance.post(`/loans/${loanId}/submit/`);
@@ -150,6 +155,7 @@ export default {
   createLoan,
   getLoanDetail,
   updateLoan,
+  listLoans,
   submitLoan,
   uploadLoanDocument,
   uploadLoanDocumentsBulk,

@@ -16,10 +16,12 @@ import { ClientProfilePage } from './pages/ClientProfilePage';
 
 import LoanOfficerClientsPage from './pages/LoanOfficerClientsPage';
 import LoanOfficerClientLoanContextPage from './pages/LoanOfficerClientLoanContextPage';
+import LoanManagementPage from './pages/LoanManagementPage';
 import BranchManagerLoanQueuePage from './pages/BranchManagerLoanQueuePage';
 import BranchManagerLoanDetailPage from './pages/BranchManagerLoanDetailPage';
 import CashierLoanQueuePage from './pages/CashierLoanQueuePage';
 import CashierDisbursementPage from './pages/CashierDisbursementPage';
+import CashierLoanManagementClientsPage from './pages/CashierLoanManagementClientsPage';
 
 import axiosInstance from './api/axios';
 
@@ -206,6 +208,17 @@ const AppRoutes = () => {
         }
       />
 
+      <Route
+        path="/clients/:clientId/loans/:loanId"
+        element={
+          <RequireAuth>
+            <RequireRole roles={['LOAN_OFFICER', 'CASHIER']}>
+              <LoanManagementPage />
+            </RequireRole>
+          </RequireAuth>
+        }
+      />
+
       {/* =========================
           LOAN OFFICER ROUTES
          ========================= */}
@@ -287,6 +300,17 @@ const AppRoutes = () => {
       <RequireAuth>
           <RequireRole role="CASHIER">
           <CashierLoanQueuePage />
+        </RequireRole>
+      </RequireAuth>
+    }
+  />
+
+  <Route
+    path="/cashier/loan-management"
+    element={
+      <RequireAuth>
+        <RequireRole role="CASHIER">
+          <CashierLoanManagementClientsPage />
         </RequireRole>
       </RequireAuth>
     }

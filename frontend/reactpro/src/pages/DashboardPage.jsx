@@ -71,9 +71,14 @@ export const DashboardPage = () => {
         )}
 
           {user?.role === 'CASHIER' && (
-            <button onClick={() => navigate('/cashier/loans')} style={cardBtn('#111')}>
-              Loan Approvals
-            </button>
+            <>
+              <button onClick={() => navigate('/cashier/loan-management')} style={cardBtn('#007bff')}>
+                Loan Management
+              </button>
+              <button onClick={() => navigate('/cashier/loans')} style={cardBtn('#111')}>
+                Loan Disbursement
+              </button>
+            </>
   )}
       </div>
 

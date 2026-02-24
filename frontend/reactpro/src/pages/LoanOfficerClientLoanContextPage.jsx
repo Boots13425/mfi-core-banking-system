@@ -476,6 +476,11 @@ const LoanOfficerClientLoanContextPage = () => {
   const kycStatus = context?.kyc_status;
   const hasMissingDocs = context?.missing_documents && context.missing_documents.length > 0;
 
+  const manageableLoans = loans.filter(
+    (l) => l.status === 'ACTIVE' || l.status === 'DISBURSED'
+  );
+  const latestManageableLoan = manageableLoans[0] || null;
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -507,7 +512,7 @@ const LoanOfficerClientLoanContextPage = () => {
                 <h2 style={styles.cardTitle}>Client Information</h2>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {statusPill(client?.status || "UNKNOWN")}
-                  {statusPill(kycStatus || "KYC_UNKNOWN")}
+                 {/*{statusPill(kycStatus || "KYC_UNKNOWN")} */} 
                 </div>
               </div>
 
@@ -612,7 +617,7 @@ const LoanOfficerClientLoanContextPage = () => {
                       <div style={styles.value}>{activeLoan.term_months ?? "—"}</div>
                     </div>
                   </div>
-
+{/*
                   <div style={{ marginTop: 14 }}>
                     <h3 style={styles.sectionTitle}>Loan Documents</h3>
 
@@ -656,6 +661,7 @@ const LoanOfficerClientLoanContextPage = () => {
                       </table>
                     )}
                   </div>
+                  */}
                 </>
               )}
             </div>
@@ -708,6 +714,24 @@ const LoanOfficerClientLoanContextPage = () => {
                   }}
                 >
                   {showRepayment ? "Close Repayment" : "Post Repayment"}
+                </button>
+
+                <button
+                  style={{
+                    ...styles.btn,
+                    ...(latestManageableLoan
+                      ? styles.btnMuted
+                      : { opacity: 0.55, cursor: "not-allowed" }),
+                  }}
+                  disabled={!latestManageableLoan}
+                  onClick={() => {
+                    if (!latestManageableLoan) return;
+                    navigate(
+                      `/clients/${clientId}/loans/${latestManageableLoan.id}`
+                    );
+                  }}
+                >
+                  Manage Loan
                 </button>
 
                 <div>
