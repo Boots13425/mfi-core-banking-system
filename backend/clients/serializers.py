@@ -2,8 +2,24 @@ from rest_framework import serializers
 from .models import Client, KYC, KYCDocument
 
 
+def _get_client_photo_url(client, request=None):
+    """Return absolute URL of the client's KYC photo if available, else None."""
+    try:
+        # access through related_name (kyc.documents) to avoid extra query when possible
+        kyc = client.kyc
+        photo = kyc.documents.filter(document_type='PHOTO').only('file').first()
+        if photo and photo.file:
+            if request:
+                return request.build_absolute_uri(photo.file.url)
+            return photo.file.url
+    except (KYC.DoesNotExist, AttributeError):
+        pass
+    return None
+
+
 class ClientSerializer(serializers.ModelSerializer):
     branch_display = serializers.SerializerMethodField(read_only=True)
+    photo_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Client
@@ -18,6 +34,7 @@ class ClientSerializer(serializers.ModelSerializer):
             'status',
             'branch',          # kept for compatibility (will be an id)
             'branch_display',  # new: readable label for UI
+            'photo_url',       # client photo for dashboards
             'created_by',
             'created_at',
             'updated_at',
@@ -33,6 +50,11 @@ class ClientSerializer(serializers.ModelSerializer):
         if not obj.branch:
             return None
         return str(obj.branch)
+
+    def get_photo_url(self, obj):
+        """SerializerMethodField helper for photo_url."""
+        request = self.context.get('request')
+        return _get_client_photo_url(obj, request)
 
     def validate(self, data):
         """

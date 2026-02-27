@@ -5,6 +5,19 @@ from .models import (
 )
 from clients.models import Client, KYC
 from clients.models import KYCDocument
+
+# helper to fetch photo url from client object (duplicate of clients.serializers util)
+def _get_client_photo_url(client, request=None):
+    try:
+        kyc = client.kyc
+        photo = kyc.documents.filter(document_type='PHOTO').only('file').first()
+        if photo and photo.file:
+            if request:
+                return request.build_absolute_uri(photo.file.url)
+            return photo.file.url
+    except (KYC.DoesNotExist, AttributeError):
+        pass
+    return None
 from django.utils import timezone
 from django.db.utils import ProgrammingError
 from decimal import Decimal
@@ -94,12 +107,18 @@ class PenaltyWaiverSerializer(serializers.ModelSerializer):
 
 class LoanListSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.full_name', read_only=True)
+    client_photo_url = serializers.SerializerMethodField(read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     
     class Meta:
         model = Loan
-        fields = ['id', 'client', 'client_name', 'product_name', 'amount', 'purpose', 'term_months', 'status', 
+        fields = ['id', 'client', 'client_name', 'client_photo_url', 'product_name', 'amount', 'purpose', 'term_months', 'status', 
                   'created_at', 'submitted_at', 'approved_at', 'disbursed_at']
+
+    def get_client_photo_url(self, obj):
+        """Return absolute or relative photo url for the loan's client."""
+        request = self.context.get('request')
+        return _get_client_photo_url(obj.client, request)
 
 
 class LoanDetailSerializer(serializers.ModelSerializer):
@@ -135,6 +154,7 @@ class LoanDetailSerializer(serializers.ModelSerializer):
             'email': obj.client.email,
             'status': obj.client.status,
             'kyc_status': kyc_status,
+            'photo_url': _get_client_photo_url(obj.client, self.context.get('request')),
         }
 
     def to_representation(self, instance):

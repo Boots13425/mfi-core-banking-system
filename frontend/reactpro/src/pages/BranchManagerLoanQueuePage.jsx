@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubmittedLoans } from '../api/loans';
+import ClientAvatar from '../components/ClientAvatar';
 
 const styles = {
   page: { maxWidth: 1100, margin: '0 auto', padding: 16 },
@@ -119,7 +120,19 @@ const BranchManagerLoanQueuePage = () => {
               {loans.map((loan) => (
                 <tr key={loan.id}>
                   <td style={styles.td}>{loan.id}</td>
-                  <td style={styles.td}>{loan.client_name}</td>
+                  <td style={styles.td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {loan.client_photo_url && (
+                        <ClientAvatar
+                          photoUrl={loan.client_photo_url}
+                          name={loan.client_name}
+                          size={40}
+                          onClick={() => window.open(loan.client_photo_url, '_blank')}
+                        />
+                      )}
+                      {loan.client_name}
+                    </div>
+                  </td>
                   <td style={styles.td}>{loan.product_name}</td>
                   <td style={styles.tdRight}>{loan.amount}</td>
                   <td style={styles.td}>

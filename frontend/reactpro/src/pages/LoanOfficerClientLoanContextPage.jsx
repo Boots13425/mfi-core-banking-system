@@ -10,6 +10,7 @@ import {
   submitLoan,
   postRepayment,
 } from "../api/loans";
+import ClientAvatar from '../components/ClientAvatar';
 
 const LoanOfficerClientLoanContextPage = () => {
   const { clientId } = useParams();
@@ -522,6 +523,16 @@ const LoanOfficerClientLoanContextPage = () => {
               </div>
 
               <div>
+                {client?.photo_url && (
+                  <div style={{ padding: '0 16px 16px' }}>
+                    <ClientAvatar
+                      photoUrl={client.photo_url}
+                      name={client.full_name}
+                      size={90}
+                      onClick={() => window.open(client.photo_url, '_blank')}
+                    />
+                  </div>
+                )}
                 <div style={styles.infoRow}>
                   <div style={styles.label}>Name</div>
                   <div style={styles.value}>{client?.full_name || "—"}</div>

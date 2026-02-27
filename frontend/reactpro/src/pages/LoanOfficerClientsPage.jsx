@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/http";
+import ClientAvatar from '../components/ClientAvatar';
 
 export default function LoanOfficerClientsPage() {
   const navigate = useNavigate();
@@ -111,7 +112,19 @@ export default function LoanOfficerClientsPage() {
             <tbody>
               {filtered.map((c) => (
                 <tr key={c.id} style={{ borderTop: "1px solid #eee" }}>
-                  <td style={td}>{c.full_name || "—"}</td>
+                  <td style={td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {c.photo_url && (
+                        <ClientAvatar
+                          photoUrl={c.photo_url}
+                          name={c.full_name}
+                          size={40}
+                          onClick={() => window.open(c.photo_url, '_blank')}
+                        />
+                      )}
+                      {c.full_name || "—"}
+                    </div>
+                  </td>
                   <td style={tdMono}>{c.national_id || "—"}</td>
                   <td style={tdMono}>{c.phone || "—"}</td>
                   <td style={td}>
