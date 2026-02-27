@@ -75,7 +75,8 @@ const CashierDisbursementPage = () => {
     disbursement_reference: '',
   });
 
-  const [hoverBack, setHoverBack] = useState(false);
+  const [hoverBackQueue, setHoverBackQueue] = useState(false);
+  const [hoverBackDashboard, setHoverBackDashboard] = useState(false);
   const [hoverSubmit, setHoverSubmit] = useState(false);
 
   useEffect(() => {
@@ -124,14 +125,22 @@ const CashierDisbursementPage = () => {
 
   return (
     <div style={styles.page}>
-      <div style={styles.backWrap}>
+      <div style={{ ...styles.backWrap, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <button
           onClick={() => navigate('/cashier/loans')}
-          style={styles.backBtn(hoverBack)}
-          onMouseEnter={() => setHoverBack(true)}
-          onMouseLeave={() => setHoverBack(false)}
+          style={styles.backBtn(hoverBackQueue)}
+          onMouseEnter={() => setHoverBackQueue(true)}
+          onMouseLeave={() => setHoverBackQueue(false)}
         >
           ← Back to Queue
+        </button>
+        <button
+          onClick={() => navigate('/dashboard')}
+          style={styles.backBtn(hoverBackDashboard)}
+          onMouseEnter={() => setHoverBackDashboard(true)}
+          onMouseLeave={() => setHoverBackDashboard(false)}
+        >
+          ← Back to Dashboard
         </button>
       </div>
 

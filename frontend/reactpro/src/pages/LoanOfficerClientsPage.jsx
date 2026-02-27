@@ -43,7 +43,22 @@ export default function LoanOfficerClientsPage() {
   return (
     <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-        <h2 style={{ margin: 0 }}>Loan Officer – Clients</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => navigate("/dashboard")}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #ddd",
+              cursor: "pointer",
+              background: "#fff",
+              fontWeight: 700,
+            }}
+          >
+            ← Back to Dashboard
+          </button>
+          <h2 style={{ margin: 0 }}>Loan Officer – Clients</h2>
+        </div>
         <button
           onClick={load}
           style={{

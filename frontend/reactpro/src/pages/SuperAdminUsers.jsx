@@ -124,6 +124,17 @@ export const SuperAdminUsers = () => {
     }
   };
 
+  const handlePasswordReset = async (id) => {
+    try {
+      setError('');
+      await axiosInstance.post(`/admin/users/${id}/send_password_reset/`);
+      // Simple UX feedback; could be replaced with a toast system if added later.
+      alert('Password reset link sent successfully.');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to send password reset link');
+    }
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <button onClick={() => navigate('/super-admin')} style={{ marginBottom: '20px', padding: '10px 15px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
@@ -211,7 +222,18 @@ export const SuperAdminUsers = () => {
                 <td style={{ border: '1px solid #ddd', padding: '10px' }}>{user.branch_name || '-'}</td>
                 <td style={{ border: '1px solid #ddd', padding: '10px' }}>{user.is_active ? 'Active' : 'Inactive'}</td>
                 <td style={{ border: '1px solid #ddd', padding: '10px' }}>
-                  <button onClick={() => handleEdit(user)} style={{ padding: '5px 10px', marginRight: '5px', background: '#17a2b8', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>
+                  <button
+                    onClick={() => handleEdit(user)}
+                    style={{ padding: '5px 10px', marginRight: '5px', background: '#17a2b8', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handlePasswordReset(user.id)}
+                    style={{ padding: '5px 10px', marginRight: '5px', background: '#ffc107', color: '#212529', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Password Reset
+                  </button>
                   {user.is_active ? (
                     <button onClick={() => handleDeactivate(user.id)} style={{ padding: '5px 10px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}>Deactivate</button>
                   ) : (

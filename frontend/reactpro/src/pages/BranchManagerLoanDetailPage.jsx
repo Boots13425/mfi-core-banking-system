@@ -100,7 +100,8 @@ const BranchManagerLoanDetailPage = () => {
   const [remarks, setRemarks] = useState('');
 
   // hover states for inline styling
-  const [hoverBack, setHoverBack] = useState(false);
+  const [hoverBackQueue, setHoverBackQueue] = useState(false);
+  const [hoverBackDashboard, setHoverBackDashboard] = useState(false);
   const [hoverLinkId, setHoverLinkId] = useState(null);
   const [hoverBtn, setHoverBtn] = useState(null);
 
@@ -161,14 +162,22 @@ const BranchManagerLoanDetailPage = () => {
 
   return (
     <div style={styles.page}>
-      <div style={styles.backWrap}>
+      <div style={{ ...styles.backWrap, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <button
           onClick={() => navigate('/branch-manager/loans')}
-          style={styles.backBtn(hoverBack)}
-          onMouseEnter={() => setHoverBack(true)}
-          onMouseLeave={() => setHoverBack(false)}
+          style={styles.backBtn(hoverBackQueue)}
+          onMouseEnter={() => setHoverBackQueue(true)}
+          onMouseLeave={() => setHoverBackQueue(false)}
         >
           ← Back to Queue
+        </button>
+        <button
+          onClick={() => navigate('/dashboard')}
+          style={styles.backBtn(hoverBackDashboard)}
+          onMouseEnter={() => setHoverBackDashboard(true)}
+          onMouseLeave={() => setHoverBackDashboard(false)}
+        >
+          ← Back to Dashboard
         </button>
       </div>
 

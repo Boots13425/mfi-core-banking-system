@@ -3,7 +3,7 @@
 export function getAuthToken() {
   // Try common keys (including our actual key used by axios.js)
   return (
-    localStorage.getItem("accessToken") ||   // ✅ ADD THIS
+    localStorage.getItem("accessToken") ||   
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     localStorage.getItem("token") ||

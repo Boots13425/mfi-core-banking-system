@@ -18,43 +18,220 @@ from .serializers import (
     BranchSerializer, AuditLogSerializer
 )
 from .permissions import IsSuperAdmin
-from .utils import send_invite_email, create_audit_log, get_client_ip
+from .utils import (
+    send_invite_email,
+    send_password_reset_email,
+    create_audit_log,
+    get_client_ip,
+)
+
+MAX_LOGIN_ATTEMPTS = 4
+
+
+def _handle_failed_login_attempt(request, user):
+    """
+    Increment failed attempts for non-super-admin operators and auto-deactivate at threshold.
+    Returns (locked: bool, remaining_attempts: int | None).
+    """
+    if not user or user.role == 'SUPER_ADMIN':
+        # Do not lock out super admins via this mechanism
+        return False, None
+
+    if not user.is_active:
+        return False, None
+
+    user.failed_login_attempts += 1
+
+    if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
+        user.is_active = False
+        user.save(update_fields=['failed_login_attempts', 'is_active'])
+
+        create_audit_log(
+            actor=None,
+            action='USER_AUTO_DEACTIVATED',
+            target_type='User',
+            target_id=str(user.id),
+            summary=(
+                f"User {user.username} ({user.email}) automatically deactivated "
+                f"after {MAX_LOGIN_ATTEMPTS} failed login attempts"
+            ),
+            ip_address=get_client_ip(request),
+        )
+        return True, 0
+
+    remaining = MAX_LOGIN_ATTEMPTS - user.failed_login_attempts
+    user.save(update_fields=['failed_login_attempts'])
+    return False, remaining
+
+
+def _reset_failed_attempts_if_needed(user):
+    if user and user.failed_login_attempts:
+        user.failed_login_attempts = 0
+        user.save(update_fields=['failed_login_attempts'])
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
-    """Login with username + password (backward compatible)"""
-    serializer = LoginSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    user = serializer.validated_data['user']
-    
-    if not user.is_active:
+    """Login with username + password (with limited trial attempts for operators)"""
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    if not username or not password:
         return Response(
-            {'detail': 'User account is inactive'},
-            status=status.HTTP_403_FORBIDDEN
+            {'detail': 'Username and password are required'},
+            status=status.HTTP_400_BAD_REQUEST,
         )
-    
-    refresh = RefreshToken.for_user(user)
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-        'user': UserSerializer(user).data
-    }, status=status.HTTP_200_OK)
+
+    # Best-effort fetch to track attempts even on invalid credentials
+    user = User.objects.filter(username=username).first()
+
+    # If the account is already inactive, short-circuit with clear message
+    if user and not user.is_active:
+        return Response(
+            {
+                'detail': (
+                    'Your account is inactive. Please contact the Super Admin for '
+                    'activation and/or password reset.'
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    auth_user = authenticate(username=username, password=password)
+    if not auth_user:
+        # Failed login attempt
+        locked, remaining = _handle_failed_login_attempt(request, user)
+        if locked:
+            return Response(
+                {
+                    'detail': (
+                        'Your account has been deactivated due to too many failed '
+                        'login attempts. Please contact the Super Admin for '
+                        'activation and/or password reset.'
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Generic invalid credentials message with remaining attempts info when available
+        if remaining is not None and remaining > 0:
+            return Response(
+                {
+                    'detail': (
+                        f'Invalid credentials. You have {remaining} '
+                        f'login attempt{"s" if remaining != 1 else ""} left '
+                        'before your account is deactivated.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {'detail': 'Invalid credentials'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Successful authentication – ensure account is active
+    if not auth_user.is_active:
+        return Response(
+            {
+                'detail': (
+                    'Your account is inactive. Please contact the Super Admin for '
+                    'activation and/or password reset.'
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    _reset_failed_attempts_if_needed(auth_user)
+
+    refresh = RefreshToken.for_user(auth_user)
+    return Response(
+        {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(auth_user).data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_email(request):
-    """Login with email + password"""
-    serializer = EmailLoginSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    user = serializer.validated_data['user']
-    
+    """Login with email + password (with limited trial attempts for operators)"""
+    email = request.data.get('email')
+    password = request.data.get('password')
+
+    if not email or not password:
+        return Response(
+            {'detail': 'Email and password are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = User.objects.filter(email=email).first()
+
+    if not user:
+        # No user to track attempts for, just generic error
+        return Response(
+            {'detail': 'Invalid email or password'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not user.is_active:
+        return Response(
+            {
+                'detail': (
+                    'Your account is inactive. Please contact the Super Admin for '
+                    'activation and/or password reset.'
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if not user.check_password(password):
+        locked, remaining = _handle_failed_login_attempt(request, user)
+        if locked:
+            return Response(
+                {
+                    'detail': (
+                        'Your account has been deactivated due to too many failed '
+                        'login attempts. Please contact the Super Admin for '
+                        'activation and/or password reset.'
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if remaining is not None and remaining > 0:
+            return Response(
+                {
+                    'detail': (
+                        f'Invalid email or password. You have {remaining} '
+                        f'login attempt{"s" if remaining != 1 else ""} left '
+                        'before your account is deactivated.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {'detail': 'Invalid email or password'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    _reset_failed_attempts_if_needed(user)
+
     refresh = RefreshToken.for_user(user)
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-        'user': UserSerializer(user).data
-    }, status=status.HTTP_200_OK)
+    return Response(
+        {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(user).data,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -112,16 +289,25 @@ def invite_set_password(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Determine whether this is an initial invite or a password reset
+    had_usable_password_before = user.has_usable_password()
+
     user.set_password(new_password)
     user.is_active = True
     user.save()
     
+    action = 'PASSWORD_SET_VIA_INVITE'
+    summary = f"User {user.username} ({user.email}) set password via invite link"
+    if had_usable_password_before:
+        action = 'PASSWORD_RESET_COMPLETED'
+        summary = f"User {user.username} ({user.email}) reset password via reset link"
+    
     create_audit_log(
         actor=None,
-        action='PASSWORD_SET_VIA_INVITE',
+        action=action,
         target_type='User',
         target_id=str(user.id),
-        summary=f"User {user.username} ({user.email}) set password via invite link"
+        summary=summary
     )
     
     return Response({
@@ -288,6 +474,30 @@ class UserViewSet(viewsets.ModelViewSet):
                 )
         
         return response
+    
+    @action(detail=True, methods=['post'])
+    def send_password_reset(self, request, pk=None):
+        """
+        Send a password reset link to the selected operator.
+        """
+        user = self.get_object()
+
+        # Reuse the same set-password link generation logic used for invitations.
+        send_password_reset_email(user)
+
+        create_audit_log(
+            actor=request.user,
+            action='PASSWORD_RESET_LINK_SENT',
+            target_type='User',
+            target_id=str(user.id),
+            summary=f"Password reset link sent to {user.username} ({user.email})",
+            ip_address=get_client_ip(request)
+        )
+
+        return Response(
+            {'detail': 'Password reset link sent successfully'},
+            status=status.HTTP_200_OK
+        )
     
     @action(detail=True, methods=['patch'])
     def activate(self, request, pk=None):
