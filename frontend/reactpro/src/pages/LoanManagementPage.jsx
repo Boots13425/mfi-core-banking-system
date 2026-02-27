@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getLoanDetail, postRepayment } from "../api/loans";
+import ClientAvatar from "../components/ClientAvatar"; // Importing ClientAvatar
 import { useAuth } from "../auth/useAuth";
 
 const LoanManagementPage = () => {
@@ -542,7 +543,19 @@ const LoanManagementPage = () => {
             <div style={styles.infoGrid}>
               <div style={styles.infoItem}>
                 <span style={styles.label}>Client</span>
-                <span style={styles.value}>{client?.full_name || "—"}</span>
+                <span style={styles.value}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {client?.photo_url && (
+                      <ClientAvatar
+                        photoUrl={client.photo_url}
+                        name={client.full_name}
+                        size={40}
+                        onClick={() => window.open(client.photo_url, '_blank')}
+                      />
+                    )}
+                    {client?.full_name || "—"}
+                  </div>
+                </span>
               </div>
               <div style={styles.infoItem}>
                 <span style={styles.label}>Loan Product</span>

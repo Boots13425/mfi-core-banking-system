@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLoanDetail, disburseLoan } from '../api/loans';
+import ClientAvatar from '../components/ClientAvatar';
 
 const styles = {
   page: { maxWidth: 720, margin: '0 auto', padding: 16 },
@@ -151,7 +152,18 @@ const CashierDisbursementPage = () => {
           {/* Loan Summary */}
           <div style={styles.header}>
             <h1 style={styles.headerTitle}>Disburse Loan #{loan.id}</h1>
-            <div style={styles.headerSub}>Client: {loan.client?.full_name}</div>
+            <div style={styles.headerSub}>
+              {loan.client?.photo_url && (
+                <ClientAvatar
+                  photoUrl={loan.client.photo_url}
+                  name={loan.client.full_name}
+                  size={40}
+                  onClick={() => window.open(loan.client.photo_url, '_blank')}
+                  style={{ marginRight: 8 }}
+                />
+              )}
+              Client: {loan.client?.full_name}
+            </div>
           </div>
 
           {/* Loan Details */}

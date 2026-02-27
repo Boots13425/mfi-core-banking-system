@@ -61,6 +61,15 @@ class LoanOfficerClientListView(viewsets.ViewSet):
             try:
                 kyc = KYC.objects.get(client=client)
                 if kyc.status == 'APPROVED':
+                    # compute photo url if available
+                    photo_url = None
+                    try:
+                        photo_doc = client.kyc.documents.filter(document_type='PHOTO').only('file').first()
+                        if photo_doc and photo_doc.file:
+                            photo_url = request.build_absolute_uri(photo_doc.file.url) if request else photo_doc.file.url
+                    except Exception:
+                        photo_url = None
+
                     clients_with_approved_kyc.append({
                         'id': client.id,
                         'full_name': client.full_name,
@@ -69,6 +78,7 @@ class LoanOfficerClientListView(viewsets.ViewSet):
                         'email': client.email,
                         'status': client.status,
                         'kyc_status': kyc.status,
+                        'photo_url': photo_url,
                     })
             except KYC.DoesNotExist:
                 pass
@@ -183,6 +193,15 @@ class LoanContextView(viewsets.ViewSet):
             # Compute missing mandatory documents
             missing_documents = [d for d in required_documents if not d['uploaded']]
         
+        # include client photo if available
+        photo_url = None
+        try:
+            photo_doc = client.kyc.documents.filter(document_type='PHOTO').only('file').first()
+            if photo_doc and photo_doc.file:
+                photo_url = request.build_absolute_uri(photo_doc.file.url) if request else photo_doc.file.url
+        except Exception:
+            photo_url = None
+
         return Response({
             'client': {
                 'id': client.id,
@@ -191,6 +210,7 @@ class LoanContextView(viewsets.ViewSet):
                 'phone': client.phone,
                 'email': client.email,
                 'status': client.status,
+                'photo_url': photo_url,
             },
             'kyc': kyc_data,
             'kyc_documents': kyc_documents,

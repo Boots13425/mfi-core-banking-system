@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { listLoans } from "../api/loans";
+import ClientAvatar from '../components/ClientAvatar';
 
 const CashierLoanManagementClientsPage = () => {
   const navigate = useNavigate();
@@ -188,7 +189,19 @@ const CashierLoanManagementClientsPage = () => {
                 <tbody>
                   {loans.map((l) => (
                     <tr key={l.id}>
-                      <td style={styles.td}>{l.client_name || "—"}</td>
+                      <td style={styles.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {l.client_photo_url && (
+                            <ClientAvatar
+                              photoUrl={l.client_photo_url}
+                              name={l.client_name}
+                              size={40}
+                              onClick={() => window.open(l.client_photo_url, '_blank')}
+                            />
+                          )}
+                          {l.client_name || "—"}
+                        </div>
+                      </td>
                       <td style={styles.td}>{l.id}</td>
                       <td style={styles.td}>{l.product_name || "—"}</td>
                       <td style={styles.td}>{formatCurrency(l.amount)}</td>

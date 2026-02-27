@@ -7,6 +7,7 @@ import {
   requestLoanChanges,
 } from '../api/loans';
 
+import ClientAvatar from '../components/ClientAvatar';
 const styles = {
   page: { maxWidth: 900, margin: '0 auto', padding: 16 },
   backWrap: { marginBottom: 14 },
@@ -197,7 +198,15 @@ const BranchManagerLoanDetailPage = () => {
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>Loan Details</h2>
             <div style={styles.grid}>
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {loan.client?.photo_url && (
+                  <ClientAvatar
+                    photoUrl={loan.client.photo_url}
+                    name={loan.client.full_name}
+                    size={80}
+                    onClick={() => window.open(loan.client.photo_url, '_blank')}
+                  />
+                )}
                 <strong>Client Name:</strong> {loan.client?.full_name}
               </div>
               <div>

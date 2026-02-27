@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import axiosInstance from '../api/axios';
+import ClientAvatar from '../components/ClientAvatar';
 
 export const ClientListPage = () => {
   const navigate = useNavigate();
@@ -251,7 +252,17 @@ export const ClientListPage = () => {
                     borderRight: '1px solid #ddd',
                   }}
                 >
-                  {client.full_name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {client.photo_url && (
+                      <ClientAvatar
+                        photoUrl={client.photo_url}
+                        name={client.full_name}
+                        size={40}
+                        onClick={() => window.open(client.photo_url, '_blank')}
+                      />
+                    )}
+                    {client.full_name}
+                  </div>
                 </td>
                 <td
                   style={{
