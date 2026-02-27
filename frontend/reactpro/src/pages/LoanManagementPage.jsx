@@ -503,18 +503,23 @@ const LoanManagementPage = () => {
     <div style={styles.page}>
       <div style={styles.container}>
         <div style={styles.topBar}>
-          <button
-            style={styles.backBtn}
-            onClick={() => {
-              if (user?.role === "CASHIER") {
-                navigate("/cashier/loan-management");
-                return;
-              }
-              navigate(`/loan-officer/clients/${clientId}/loan-context`);
-            }}
-          >
-            ← Back
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              style={styles.backBtn}
+              onClick={() => {
+                if (user?.role === "CASHIER") {
+                  navigate("/cashier/loan-management");
+                  return;
+                }
+                navigate(`/loan-officer/clients/${clientId}/loan-context`);
+              }}
+            >
+              ← Back
+            </button>
+            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>
+              ← Back to Dashboard
+            </button>
+          </div>
           <div style={styles.titleWrap}>
             <h1 style={styles.title}>Loan Management</h1>
             <p style={styles.subtitle}>

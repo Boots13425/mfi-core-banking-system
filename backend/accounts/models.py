@@ -47,6 +47,7 @@ class User(AbstractUser):
         blank=True,
         related_name='users'
     )
+    failed_login_attempts = models.PositiveIntegerField(default=0)
     
     objects = CustomUserManager()
     
@@ -62,12 +63,15 @@ class AuditLog(models.Model):
         ('BRANCH_UPDATED', 'Branch Updated'),
         ('BRANCH_TOGGLED', 'Branch Toggled'),
         ('USER_INVITED', 'User Invited'),
+        ('USER_AUTO_DEACTIVATED', 'User Auto Deactivated After Failed Logins'),
+        ('PASSWORD_RESET_LINK_SENT', 'Password Reset Link Sent'),
         ('USER_UPDATED', 'User Updated'),
         ('USER_ACTIVATED', 'User Activated'),
         ('USER_DEACTIVATED', 'User Deactivated'),
         ('USER_ROLE_CHANGED', 'User Role Changed'),
         ('USER_BRANCH_CHANGED', 'User Branch Changed'),
         ('PASSWORD_SET_VIA_INVITE', 'Password Set Via Invite'),
+        ('PASSWORD_RESET_COMPLETED', 'Password Reset Completed'),
         ('CLIENT_CREATED', 'Client Created'),
         ('CLIENT_STATUS_CHANGED', 'Client Status Changed'),
         ('KYC_INITIATED', 'KYC Initiated'),

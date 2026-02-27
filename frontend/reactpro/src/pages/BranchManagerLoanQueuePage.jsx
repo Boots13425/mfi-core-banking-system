@@ -4,6 +4,15 @@ import { getSubmittedLoans } from '../api/loans';
 
 const styles = {
   page: { maxWidth: 1100, margin: '0 auto', padding: 16 },
+  backWrap: { marginBottom: 12 },
+  backBtn: {
+    background: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: 8,
+    padding: '8px 12px',
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
   title: { fontSize: 24, fontWeight: 800, marginBottom: 16 },
   alertError: {
     padding: 12,
@@ -82,6 +91,11 @@ const BranchManagerLoanQueuePage = () => {
 
   return (
     <div style={styles.page}>
+      <div style={styles.backWrap}>
+        <button style={styles.backBtn} onClick={() => navigate('/dashboard')}>
+          ← Back to Dashboard
+        </button>
+      </div>
       <h1 style={styles.title}>Loan Review Queue</h1>
 
       {error && <div style={styles.alertError}>{error}</div>}

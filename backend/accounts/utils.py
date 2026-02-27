@@ -26,10 +26,16 @@ def create_audit_log(actor, action, target_type, target_id, summary, ip_address=
     )
 
 
-def send_invite_email(user):
+def _build_from_email():
+    from_addr = getattr(settings, "DEFAULT_FROM_EMAIL", "") or getattr(settings, "EMAIL_HOST_USER", "")
+    if not from_addr:
+        from_addr = "no-reply@localhost"
+    return formataddr(("MFI TEAM", from_addr))
+
+
+def generate_set_password_link(user):
     """
-    Sends an invite email with a set-password link:
-    {FRONTEND_URL}/set-password?uid=<uid>&token=<token>
+    Build the frontend URL used for both invite and password reset flows.
     """
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
     token_generator = PasswordResetTokenGenerator()
@@ -37,7 +43,15 @@ def send_invite_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = token_generator.make_token(user)
 
-    invite_link = f"{frontend_url}/set-password?uid={uid}&token={token}"
+    return f"{frontend_url}/set-password?uid={uid}&token={token}"
+
+
+def send_invite_email(user):
+    """
+    Sends an invite email with a set-password link:
+    {FRONTEND_URL}/set-password?uid=<uid>&token=<token>
+    """
+    invite_link = generate_set_password_link(user)
 
     subject = "MFI System Invitation / Account Setup"
     message = (
@@ -49,13 +63,34 @@ def send_invite_email(user):
         "Regards,\nMFI TEAM"
     )
 
-    # Build a valid From header. Avoid dots in the display name (e.g., "ETS.NTECH") to prevent parsing errors.
-    from_addr = getattr(settings, "DEFAULT_FROM_EMAIL", "") or getattr(settings, "EMAIL_HOST_USER", "")
-    if not from_addr:
-        # Final fallback (should not happen if your .env is correct)
-        from_addr = "no-reply@localhost"
+    from_email = _build_from_email()
 
-    from_email = formataddr(("MFI TEAM", from_addr))
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=from_email,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+def send_password_reset_email(user):
+    """
+    Sends a password reset email reusing the same set-password link generation.
+    """
+    reset_link = generate_set_password_link(user)
+
+    subject = "MFI System Password Reset"
+    message = (
+        f"Hello {user.first_name or user.username},\n\n"
+        "A password reset was requested for your MFI system account.\n"
+        "Please click the link below to choose a new password:\n\n"
+        f"{reset_link}\n\n"
+        "If you did not request this reset, please contact your administrator immediately.\n\n"
+        "Regards,\nMFI TEAM"
+    )
+
+    from_email = _build_from_email()
 
     send_mail(
         subject=subject,

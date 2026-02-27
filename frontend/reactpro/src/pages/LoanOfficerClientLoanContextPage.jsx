@@ -486,9 +486,14 @@ const LoanOfficerClientLoanContextPage = () => {
       <div style={styles.container}>
         {/* Top Bar */}
         <div style={styles.topBar}>
-          <button style={styles.backBtn} onClick={() => navigate("/loan-officer/clients")}>
-            ← Back to Clients
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button style={styles.backBtn} onClick={() => navigate("/loan-officer/clients")}>
+              ← Back to Clients
+            </button>
+            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>
+              ← Back to Dashboard
+            </button>
+          </div>
 
           <div style={styles.titleWrap}>
             <h1 style={styles.title}>Client Loan Context</h1>
