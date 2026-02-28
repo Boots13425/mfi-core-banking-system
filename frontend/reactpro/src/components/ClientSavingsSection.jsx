@@ -245,7 +245,19 @@ export const ClientSavingsSection = ({ clientId, clientStatus, clientKycStatus }
                     </td>
                     <td style={{ padding: '8px' }}>{tx.tx_type}</td>
                     <td style={{ padding: '8px' }}>{tx.amount}</td>
-                    <td style={{ padding: '8px' }}>{tx.status}</td>
+                    <td
+                      style={{
+                        padding: '8px',
+                        color:
+                          tx.status === 'POSTED'
+                            ? 'green'
+                            : tx.status === 'REJECTED'
+                            ? 'red'
+                            : 'inherit',
+                      }}
+                    >
+                      {tx.status}
+                    </td>
                     <td style={{ padding: '8px' }}>{tx.reference || '-'}</td>
                   </tr>
                 ))}

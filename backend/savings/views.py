@@ -271,12 +271,17 @@ class SavingsAccountViewSet(viewsets.ViewSet):
         requires_approval = amount > product.withdrawal_requires_approval_above
         status_value = "PENDING" if requires_approval else "POSTED"
 
+        # always record who initiated the withdrawal; this is the cashier (or other
+        # user) making the request.  previously pending requests left `posted_by`
+        # blank which meant the pending list could not show who asked for the
+        # withdrawal.  branch manager approval already uses `approved_by` so we
+        # don't overwrite this field later.
         tx = SavingsTransaction.objects.create(
             account=account,
             tx_type="WITHDRAWAL",
             amount=amount,
             status=status_value,
-            posted_by=None if requires_approval else request.user,
+            posted_by=request.user,
             reference=data.get("reference") or "",
             narration=data.get("narration") or "",
         )
@@ -377,6 +382,14 @@ def branch_manager_pending_withdrawals(request):
         qs = qs.filter(account__branch_id=request.user.branch_id)
     data = []
     for tx in qs:
+        # display the full name of the user who initiated the request; fall back
+        # to username if full name is blank for any reason (unlikely but safe).
+        requester = None
+        if tx.posted_by:
+            try:
+                requester = tx.posted_by.get_full_name() or tx.posted_by.username
+            except Exception:
+                requester = tx.posted_by.username
         data.append(
             {
                 "id": tx.id,
@@ -384,7 +397,7 @@ def branch_manager_pending_withdrawals(request):
                 "account_number": tx.account.account_number,
                 "client_name": tx.account.client.full_name,
                 "amount": str(tx.amount),
-                "requested_by": getattr(tx.posted_by, "username", None),
+                "requested_by": requester,
                 "created_at": tx.created_at,
             }
         )
@@ -422,9 +435,8 @@ def branch_manager_approve_withdrawal(request, tx_id: int):
     tx.status = "POSTED"
     tx.approved_by = request.user
     tx.approved_at = datetime.utcnow()
-    if tx.posted_by is None:
-        tx.posted_by = request.user
-    tx.save(update_fields=["status", "approved_by", "approved_at", "posted_by"])
+    # posted_by already recorded at creation (cashier who requested), so leave it alone
+    tx.save(update_fields=["status", "approved_by", "approved_at"])
 
     try:
         create_audit_log(

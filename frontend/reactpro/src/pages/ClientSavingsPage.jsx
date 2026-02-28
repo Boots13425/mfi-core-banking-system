@@ -12,6 +12,9 @@ import {
   withdrawFromSavingsAccount,
 } from "../api/savings";
 
+// component used by cashiers on this page
+import { ClientSavingsSection } from "../components/ClientSavingsSection";
+
 export const ClientSavingsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -57,11 +60,8 @@ export const ClientSavingsPage = () => {
   const renderCashierSavingsSection = () => {
     if (!client) return null;
     if (user?.role !== 'CASHIER') return null;
-    // Lazy require to avoid potential import ordering issues
-    // The component file exists at src/components/ClientSavingsSection.jsx
-    // and expects props: clientId, clientStatus, clientKycStatus
-    // eslint-disable-next-line global-require
-    const { ClientSavingsSection } = require('../components/ClientSavingsSection');
+
+    // component imported at top; rendering directly avoids runtime `require` error
     return (
       <ClientSavingsSection
         clientId={clientId}

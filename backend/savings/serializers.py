@@ -63,6 +63,8 @@ class CreateSavingsAccountSerializer(serializers.Serializer):
 
 class SavingsTransactionSerializer(serializers.ModelSerializer):
     posted_by_username = serializers.CharField(source="posted_by.username", read_only=True)
+    # full name via User.get_full_name(); falls back to username automatically
+    posted_by_full_name = serializers.CharField(source="posted_by.get_full_name", read_only=True)
 
     class Meta:
         model = SavingsTransaction
@@ -75,6 +77,7 @@ class SavingsTransactionSerializer(serializers.ModelSerializer):
             "is_credit_adjustment",
             "posted_by",
             "posted_by_username",
+            "posted_by_full_name",
             "approved_by",
             "approved_at",
             "reference",
