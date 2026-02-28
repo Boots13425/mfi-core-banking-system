@@ -78,6 +78,14 @@ class AuditLog(models.Model):
         ('LOAN_CREATED', 'Loan Created'),
         ('REPAYMENT_RECORDED', 'Repayment Recorded'),
         ('LOAN_CLOSED', 'Loan Closed'),
+        ('SAVINGS_ACCOUNT_CREATED', 'Savings Account Created'),
+        ('SAVINGS_DEPOSIT_POSTED', 'Savings Deposit Posted'),
+        ('SAVINGS_WITHDRAWAL_POSTED', 'Savings Withdrawal Posted'),
+        ('SAVINGS_WITHDRAWAL_REQUESTED', 'Savings Withdrawal Requested'),
+        ('SAVINGS_WITHDRAWAL_APPROVED', 'Savings Withdrawal Approved'),
+        ('SAVINGS_WITHDRAWAL_REJECTED', 'Savings Withdrawal Rejected'),
+        ('SAVINGS_ACCOUNT_FROZEN', 'Savings Account Frozen'),
+        ('SAVINGS_ACCOUNT_CLOSED', 'Savings Account Closed'),
     ]
     
     actor = models.ForeignKey(
