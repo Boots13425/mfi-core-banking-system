@@ -6,8 +6,9 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
+        # the second dependency referenced a migration that was removed
+        # accidentally; we only need to depend on the real 0006 file here.
         ('accounts', '0006_alter_auditlog_action'),
-        ('accounts', '0006_user_failed_login_attempts_alter_auditlog_action'),
     ]
 
     operations = [
