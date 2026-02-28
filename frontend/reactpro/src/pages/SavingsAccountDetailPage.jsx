@@ -1,7 +1,8 @@
-// src/pages/SavingsAccountDetailPage.jsx
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import axiosInstance from '../api/axios';
+import ClientAvatar from '../components/ClientAvatar';
 import {
   fetchSavingsAccount,
   fetchSavingsTransactions,
@@ -16,12 +17,12 @@ export const SavingsAccountDetailPage = () => {
 
   const [account, setAccount] = useState(null);
   const [txs, setTxs] = useState([]);
-
+  const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const canDeposit = user?.role === "CASHIER" || user?.role === "BRANCH_MANAGER" || user?.role === "SUPER_ADMIN" || user?.role === "LOAN_OFFICER";
-  const canWithdraw = user?.role === "CASHIER" || user?.role === "BRANCH_MANAGER" || user?.role === "SUPER_ADMIN";
+  const canDeposit = ["CASHIER", "BRANCH_MANAGER", "SUPER_ADMIN", "LOAN_OFFICER"].includes(user?.role);
+  const canWithdraw = ["CASHIER", "BRANCH_MANAGER", "SUPER_ADMIN"].includes(user?.role);
 
   const load = async () => {
     setLoading(true);
@@ -30,8 +31,16 @@ export const SavingsAccountDetailPage = () => {
       const [a, t] = await Promise.all([fetchSavingsAccount(accountId), fetchSavingsTransactions(accountId)]);
       setAccount(a);
       setTxs(t);
-    } catch (e) {
-      setError(e?.response?.data?.detail || "Failed to load account.");
+      if (a?.client) {
+        try {
+          const res = await axiosInstance.get(`/clients/${a.client}/`);
+          setClient(res.data);
+        } catch (err) {
+          setClient(null);
+        }
+      }
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Failed to load account.");
     } finally {
       setLoading(false);
     }
@@ -48,8 +57,8 @@ export const SavingsAccountDetailPage = () => {
       await depositToSavingsAccount(accountId, { amount, narration: "Deposit" });
       alert("Deposit posted.");
       await load();
-    } catch (e) {
-      alert(e?.response?.data?.detail || "Deposit failed.");
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Deposit failed.");
     }
   };
 
@@ -61,8 +70,8 @@ export const SavingsAccountDetailPage = () => {
       if (res?.status === "PENDING") alert("Withdrawal is pending approval (large amount).");
       else alert("Withdrawal posted.");
       await load();
-    } catch (e) {
-      alert(e?.response?.data?.detail || "Withdrawal failed.");
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Withdrawal failed.");
     }
   };
 
@@ -70,124 +79,55 @@ export const SavingsAccountDetailPage = () => {
 
   return (
     <div style={{ padding: "20px" }}>
-      <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <h1 style={{ margin: 0 }}>Savings Account</h1>
-          {account?.client ? (
-            <button
-              onClick={() => navigate(`/clients/${account.client}/savings`)}
-              style={{
-                padding: "8px 14px",
-                background: "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "13px",
-              }}
-            >
-              ← Client Savings
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate("/dashboard")}
-              style={{
-                padding: "8px 14px",
-                background: "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "13px",
-              }}
-            >
-              ← Dashboard
-            </button>
-          )}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+        <button onClick={() => navigate('/clients')} style={{ padding: 8 }}> Back to Clients</button>
+        <h2 style={{ margin: 0 }}>Savings Account</h2>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => navigate('/dashboard')} style={{ padding: 8 }}> Dashboard</button>
+      </div>
+
+      {error && <div style={{ background: '#f8d7da', padding: 10, borderRadius: 4 }}>{error}</div>}
+
+      <div style={{ border: '1px solid #eee', padding: 12, borderRadius: 6, display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
+        {client?.photo_url && (
+          <ClientAvatar photoUrl={client.photo_url} name={client?.full_name} size={70} />
+        )}
+        <div>
+          <div><strong>Account #:</strong> {account?.account_number}</div>
+          <div><strong>Product:</strong> {account?.product_name}</div>
+          <div><strong>Status:</strong> {account?.status}</div>
+          <div><strong>Balance:</strong> {account?.balance}</div>
+
+          <div style={{ marginTop: 10 }}>
+            <button onClick={doDeposit} disabled={!canDeposit || account?.status !== 'ACTIVE'} style={{ marginRight: 8 }}>Deposit</button>
+            <button onClick={doWithdraw} disabled={!canWithdraw || account?.status !== 'ACTIVE'}>Withdraw</button>
+          </div>
         </div>
       </div>
 
-      {error && (
-        <div
-          style={{
-            background: "#f8d7da",
-            border: "1px solid #f5c6cb",
-            color: "#721c24",
-            padding: "10px",
-            borderRadius: "4px",
-            marginBottom: "10px",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      <div style={{ border: "1px solid #eee", borderRadius: "6px", padding: "12px", marginBottom: "14px" }}>
-        <div><b>Account #:</b> {account?.account_number}</div>
-        <div><b>Product:</b> {account?.product_name}</div>
-        <div><b>Status:</b> {account?.status}</div>
-        <div><b>Balance:</b> {account?.balance}</div>
-
-        <div style={{ marginTop: "10px" }}>
-          <button
-            onClick={doDeposit}
-            disabled={!canDeposit || account?.status !== "ACTIVE"}
-            style={{
-              padding: "8px 12px",
-              background: "#007bff",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "13px",
-              marginRight: "8px",
-            }}
-          >
-            Deposit
-          </button>
-
-          <button
-            onClick={doWithdraw}
-            disabled={!canWithdraw || account?.status !== "ACTIVE"}
-            style={{
-              padding: "8px 12px",
-              background: "#dc3545",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "13px",
-            }}
-          >
-            Withdraw
-          </button>
-        </div>
-      </div>
-
-      <div style={{ border: "1px solid #eee", borderRadius: "6px", padding: "12px" }}>
-        <h3 style={{ marginTop: 0 }}>Transactions (latest)</h3>
-
+      <div style={{ marginTop: 16 }}>
+        <h3>Transactions (latest)</h3>
         {txs.length === 0 ? (
-          <div style={{ color: "#666" }}>No transactions found.</div>
+          <div style={{ color: '#666' }}>No transactions found.</div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #eee" }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: "#f8f9fa", borderBottom: "1px solid #eee" }}>
-                <th style={{ padding: "8px", textAlign: "left" }}>Date</th>
-                <th style={{ padding: "8px", textAlign: "left" }}>Type</th>
-                <th style={{ padding: "8px", textAlign: "left" }}>Amount</th>
-                <th style={{ padding: "8px", textAlign: "left" }}>Status</th>
-                <th style={{ padding: "8px", textAlign: "left" }}>Narration</th>
+              <tr>
+                <th style={{ textAlign: 'left', padding: 8 }}>Date</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>Type</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>Amount</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>Status</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>Narration</th>
               </tr>
             </thead>
             <tbody>
-              {txs.map((t) => (
-                <tr key={t.id} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "8px" }}>{new Date(t.created_at).toLocaleString()}</td>
-                  <td style={{ padding: "8px" }}>{t.tx_type}</td>
-                  <td style={{ padding: "8px" }}>{t.amount}</td>
-                  <td style={{ padding: "8px" }}>{t.status}</td>
-                  <td style={{ padding: "8px" }}>{t.narration || "-"}</td>
+              {txs.map(t => (
+                <tr key={t.id}>
+                  <td style={{ padding: 8 }}>{new Date(t.created_at).toLocaleString()}</td>
+                  <td style={{ padding: 8 }}>{t.tx_type}</td>
+                  <td style={{ padding: 8 }}>{t.amount}</td>
+                  <td style={{ padding: 8 }}>{t.status}</td>
+                  <td style={{ padding: 8 }}>{t.narration || '-'}</td>
                 </tr>
               ))}
             </tbody>

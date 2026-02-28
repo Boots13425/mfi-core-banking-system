@@ -14,6 +14,7 @@ import {
 
 // component used by cashiers on this page
 import { ClientSavingsSection } from "../components/ClientSavingsSection";
+import ClientAvatar from '../components/ClientAvatar';
 
 export const ClientSavingsPage = () => {
   const { user } = useAuth();
@@ -146,7 +147,23 @@ export const ClientSavingsPage = () => {
     <div style={{ padding: "20px" }}>
       <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={() => navigate('/clients')}
+            style={{
+              padding: "8px 14px",
+              background: "#6c757d",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "13px",
+            }}
+          >
+            ← Back to Clients
+          </button>
+
           <h1 style={{ margin: 0 }}>Client Savings</h1>
+
           <button
             onClick={() => navigate(`/dashboard`)}
             style={{
@@ -180,14 +197,26 @@ export const ClientSavingsPage = () => {
         </div>
       )}
 
-      <div style={{ marginBottom: "16px", border: "1px solid #eee", borderRadius: "6px", padding: "12px" }}>
-        <div><b>Client:</b> {client?.full_name || `${client?.first_name || ""} ${client?.last_name || ""}`}</div>
-        <div><b>Status:</b> {client?.status}</div>
-        {!isActiveClient && (
-          <div style={{ marginTop: "8px", color: "#856404", background: "#fff3cd", border: "1px solid #ffeeba", padding: "10px", borderRadius: "4px" }}>
-            Savings accounts can only be created for <b>ACTIVE</b> clients with <b>APPROVED KYC</b>.
+      <div style={{ marginBottom: "16px", border: "1px solid #eee", borderRadius: "6px", padding: "12px", display: 'flex', gap: 12, alignItems: 'center' }}>
+        {client?.photo_url && (
+          <div>
+            <ClientAvatar
+              photoUrl={client.photo_url}
+              name={client?.full_name}
+              size={70}
+              onClick={() => window.open(client.photo_url, '_blank')}
+            />
           </div>
         )}
+        <div>
+          <div><b>Client:</b> {client?.full_name || `${client?.first_name || ""} ${client?.last_name || ""}`}</div>
+          <div><b>Status:</b> {client?.status}</div>
+          {!isActiveClient && (
+            <div style={{ marginTop: "8px", color: "#856404", background: "#fff3cd", border: "1px solid #ffeeba", padding: "10px", borderRadius: "4px" }}>
+              Savings accounts can only be created for <b>ACTIVE</b> clients with <b>APPROVED KYC</b>.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Open Account */}
