@@ -220,8 +220,8 @@ class LoanViewSet(viewsets.ModelViewSet):
         elif role == 'BRANCH_MANAGER':
             return Loan.objects.filter(branch=branch)
         elif role == 'CASHIER':
-            # Cashier sees approved and active loans
-            return Loan.objects.filter(status__in=['APPROVED', 'ACTIVE'])
+            # Cashier sees approved and active loans, limited to their branch
+            return Loan.objects.filter(branch=branch, status__in=['APPROVED', 'ACTIVE'])
 
         # Fallback: check for profile object (backwards compatibility)
         if hasattr(user, 'profile'):
@@ -230,7 +230,7 @@ class LoanViewSet(viewsets.ModelViewSet):
             if prow == 'LOAN_OFFICER' or prow == 'BRANCH_MANAGER':
                 return Loan.objects.filter(branch=pbranch)
             if prow == 'CASHIER':
-                return Loan.objects.filter(status__in=['APPROVED', 'DISBURSED', 'ACTIVE'])
+                return Loan.objects.filter(branch=pbranch, status__in=['APPROVED', 'DISBURSED', 'ACTIVE'])
 
         return Loan.objects.none()
     
@@ -249,10 +249,18 @@ class LoanViewSet(viewsets.ModelViewSet):
         # Get product to set default values
         product = serializer.validated_data['product']
         
+        user_branch = getattr(request.user, 'branch', None)
+        # enforce that client belongs to the same branch as the operator
+        client = serializer.validated_data.get('client')
+        if client and user_branch and client.branch_id != user_branch.id:
+            return Response(
+                {'error': 'Client does not belong to your branch.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         # Prepare additional fields
         save_kwargs = {
             'loan_officer': request.user,
-            'branch': getattr(request.user, 'branch', None),
+            'branch': user_branch,
             'status': 'DRAFT',
         }
         
@@ -264,6 +272,14 @@ class LoanViewSet(viewsets.ModelViewSet):
             save_kwargs['term_months'] = product.term_months
         
         # Save with all required fields
+        # enforce that client belongs to the same branch as the operator
+        client = serializer.validated_data.get('client')
+        if client and branch and client.branch_id != branch.id:
+            return Response(
+                {'error': 'Client does not belong to your branch.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         loan = serializer.save(**save_kwargs)
         
         # Log audit using accounts.AuditLog fields (actor/action/target_type/target_id/summary)
@@ -290,11 +306,45 @@ class LoanViewSet(viewsets.ModelViewSet):
             LoanDetailSerializer(loan, context={'request': request}).data,
             status=status.HTTP_201_CREATED
         )
+
+    def update(self, request, *args, **kwargs):
+        # ensure branch ownership
+        loan = self.get_object()
+        user_branch = getattr(request.user, 'branch', None)
+        if user_branch and loan.branch_id != user_branch.id:
+            return Response({'error': 'Loan not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(loan, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        client = serializer.validated_data.get('client')
+        if client and user_branch and client.branch_id != user_branch.id:
+            return Response({'error': 'Client does not belong to your branch.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_update(serializer)
+        return Response(LoanDetailSerializer(loan, context={'request': request}).data)
+
+    def partial_update(self, request, *args, **kwargs):
+        loan = self.get_object()
+        user_branch = getattr(request.user, 'branch', None)
+        if user_branch and loan.branch_id != user_branch.id:
+            return Response({'error': 'Loan not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(loan, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        client = serializer.validated_data.get('client')
+        if client and user_branch and client.branch_id != user_branch.id:
+            return Response({'error': 'Client does not belong to your branch.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_update(serializer)
+        return Response(LoanDetailSerializer(loan, context={'request': request}).data)
     
     @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
         """POST /api/loans/<id>/submit/ - Submit for approval."""
         loan = self.get_object()
+        # Ensure the loan belongs to user's branch
+        if getattr(request.user, 'branch', None) and loan.branch_id != request.user.branch_id:
+            return Response({'error': 'Loan not found.'}, status=status.HTTP_404_NOT_FOUND)
         
         # Enforce: submit only from DRAFT or CHANGES_REQUESTED
         if loan.status not in ['DRAFT', 'CHANGES_REQUESTED']:
@@ -782,14 +832,21 @@ class CashierLoanViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def approved(self, request):
         """GET /api/cashier/loans/approved/"""
-        loans = Loan.objects.filter(status='APPROVED').order_by('-approved_at')
+        loans = Loan.objects.filter(
+            status='APPROVED',
+            branch=getattr(request.user, 'branch', None)
+        ).order_by('-approved_at')
         serializer = LoanListSerializer(loans, many=True)
         return Response(serializer.data)
     
     @action(detail=False, methods=['post'], url_path='(?P<loan_id>[^/.]+)/disburse')
     def disburse(self, request, loan_id=None):
         """POST /api/cashier/loans/<id>/disburse/ - Disburse approved loan."""
-        loan = get_object_or_404(Loan, id=loan_id)
+        loan = get_object_or_404(
+            Loan,
+            id=loan_id,
+            branch=getattr(request.user, 'branch', None)
+        )
         
         # Enforce: disburse only APPROVED loans
         if loan.status != 'APPROVED':
