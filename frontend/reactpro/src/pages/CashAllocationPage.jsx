@@ -25,7 +25,7 @@ export default function CashAllocationPage() {
 
   async function fetchData() {
     setLoading(true);
-    setMsg('');
+
     try {
       const cashiersRes = await axiosInstance.get('/admin/users/branch_cashiers/');
       setCashiers(cashiersRes.data || []);

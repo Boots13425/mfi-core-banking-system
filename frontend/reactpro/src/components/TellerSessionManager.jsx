@@ -13,7 +13,7 @@ export const TellerSessionManager = ({ onSessionReady }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await axiosInstance.get('/teller-sessions/my_active/');
+      const res = await axiosInstance.get('/cash/sessions/my_active/');
       setSession(res.data);
       // If session is ACTIVE, notify parent
       if (res.data.status === 'ACTIVE' && onSessionReady) {
@@ -27,7 +27,7 @@ export const TellerSessionManager = ({ onSessionReady }) => {
 
   const fetchAllocatedSession = async () => {
     try {
-      const res = await axiosInstance.get('/teller-sessions/');
+      const res = await axiosInstance.get('/cash/sessions/');
       const allocated = res.data.find((s) => s.status === 'ALLOCATED');
       if (allocated) {
         setSession(allocated);
@@ -52,7 +52,7 @@ export const TellerSessionManager = ({ onSessionReady }) => {
     }
     setSubmitting(true);
     try {
-      const res = await axiosInstance.post(`/teller-sessions/${session.id}/confirm_opening/`, {
+      const res = await axiosInstance.post(`/cash/sessions/${session.id}/confirm_opening/`, {
         counted_opening_amount: countedAmount,
       });
       setSession(res.data);
