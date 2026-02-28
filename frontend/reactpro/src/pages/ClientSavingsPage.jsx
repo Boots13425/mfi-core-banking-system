@@ -32,6 +32,20 @@ export const ClientSavingsPage = () => {
     opening_deposit: "",
   });
 
+  // when the selected product changes, pre‑populate opening deposit with the
+  // product's minimum opening balance; the cashier can still edit the field.
+  useEffect(() => {
+    if (openForm.product_id) {
+      const prod = products.find((p) => p.id === Number(openForm.product_id));
+      if (prod) {
+        setOpenForm((s) => ({
+          ...s,
+          opening_deposit: prod.min_opening_balance || "",
+        }));
+      }
+    }
+  }, [openForm.product_id, products]);
+
   const load = async () => {
     setLoading(true);
     setError(null);

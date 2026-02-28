@@ -368,6 +368,16 @@ const SavingsModal = ({ title, onClose, children }) => (
 const OpenAccountForm = ({ products, clientId, onClose, onSuccess }) => {
   const [productId, setProductId] = useState(products[0]?.id || '');
   const [openingDeposit, setOpeningDeposit] = useState('');
+
+  // auto-fill deposit when selected product changes
+  useEffect(() => {
+    if (productId) {
+      const prod = products.find((p) => p.id === Number(productId));
+      if (prod) {
+        setOpeningDeposit(prod.min_opening_balance || '');
+      }
+    }
+  }, [productId, products]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
