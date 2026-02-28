@@ -16,23 +16,20 @@ import { ClientProfilePage } from './pages/ClientProfilePage';
 import LoanOfficerClientsPage from './pages/LoanOfficerClientsPage';
 import LoanOfficerClientLoanContextPage from './pages/LoanOfficerClientLoanContextPage';
 import { SavingsWithdrawalApprovalsPage } from './pages/SavingsWithdrawalApprovalsPage';
-
-// Wire routes for the saving management
 import { SavingsProductsPage } from './pages/SavingsProductsPage';
 import { ClientSavingsPage } from './pages/ClientSavingsPage';
 import { SavingsAccountDetailPage } from './pages/SavingsAccountDetailPage';
 import { CashierSavingsClientsPage } from './pages/CashierSavingsClientsPage';
-
-
-
-
-// other lazily referenced pages that are default exports
 import LoanManagementPage from './pages/LoanManagementPage';
 import BranchManagerLoanQueuePage from './pages/BranchManagerLoanQueuePage';
 import BranchManagerLoanDetailPage from './pages/BranchManagerLoanDetailPage';
 import CashierLoanQueuePage from './pages/CashierLoanQueuePage';
 import CashierLoanManagementClientsPage from './pages/CashierLoanManagementClientsPage';
 import CashierDisbursementPage from './pages/CashierDisbursementPage';
+import TellerSessionPage from "./pages/TellerSessionPage.jsx";
+import CashAllocationPage from "./pages/CashAllocationPage.jsx";
+import ReconciliationReviewPage from "./pages/ReconciliationReviewPage.jsx";
+
 
 import axiosInstance from './api/axios';
 
@@ -407,6 +404,21 @@ const AppRoutes = () => {
       </RequireAuth>
     }
   />
+
+  <Route
+   path="/cash/session" 
+   element={<TellerSessionPage />}
+    />
+
+<Route 
+  path="/cash/allocation" 
+  element={<CashAllocationPage />}
+  />
+
+<Route 
+  path="/cash/reconciliation"
+  element={<ReconciliationReviewPage />}
+   />
 
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
