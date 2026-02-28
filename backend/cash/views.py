@@ -27,6 +27,9 @@ from .services import (
     reverse_cash_entry,
 )
 
+# audit utility from accounts
+from accounts.utils import create_audit_log
+
 User = get_user_model()
 
 
@@ -93,6 +96,19 @@ class TellerSessionViewSet(viewsets.ModelViewSet):
         # Ensure vault exists for branch (optional)
         BranchVault.objects.get_or_create(branch_id=branch_id)
 
+        # audit: record allocation
+        create_audit_log(
+            actor=request.user,
+            action='CASH_ALLOCATED',
+            target_type='TellerSession',
+            target_id=session.id,
+            summary=(
+                f"Allocated {opening_amount} to cashier {cashier.username} "
+                f"(session #{session.id})"
+            ),
+            ip_address=get_client_ip(request)
+        )
+
         return Response(TellerSessionSerializer(session).data, status=201)
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsCashier])
@@ -131,6 +147,20 @@ class TellerSessionViewSet(viewsets.ModelViewSet):
 
         close_session(session=session, cashier=request.user, counted_closing_amount=counted, variance_note=note)
         session.refresh_from_db()
+
+        # audit: record closure
+        create_audit_log(
+            actor=request.user,
+            action='SESSION_CLOSED',
+            target_type='TellerSession',
+            target_id=session.id,
+            summary=(
+                f"Closed session #{session.id}: expected {session.expected_closing_amount} "
+                f"counted {session.counted_closing_amount} variance {session.variance_amount}"
+            ),
+            ip_address=get_client_ip(request)
+        )
+
         return Response(TellerSessionSerializer(session).data)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsBranchManager])

@@ -79,6 +79,9 @@ export default function CashAllocationPage() {
     );
   }
 
+  const allocatedSessions = sessions.filter((s) => s.status === 'ALLOCATED');
+  const activeSessions = sessions.filter((s) => s.status === 'ACTIVE');
+  const closedSessions = sessions.filter((s) => s.status === 'CLOSED');
 
   return (
     <div style={{ padding: 20 }}>
@@ -147,6 +150,75 @@ export default function CashAllocationPage() {
           Allocate Cash
         </button>
       </div>
+
+      {/* overview cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20, marginTop: 20 }}>
+        <Card label="Active Sessions" count={activeSessions.length} color="#10b981" />
+        <Card label="Pending Confirmation" count={allocatedSessions.length} color="#f59e0b" />
+        <Card label="Closed Sessions" count={closedSessions.length} color="#6b7280" />
+      </div>
+
+      {/* allocated-pending sessions cards */}
+      {allocatedSessions.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #eee", padding: 16, marginBottom: 20 }}>
+          <h3 style={{ margin: "0 0 14px 0", color: "#333" }}>Pending Confirmation ({allocatedSessions.length})</h3>
+          <div style={{ display: "grid", gap: 10 }}>
+            {allocatedSessions.map((s) => (
+              <SessionCard key={s.id} session={s} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* active sessions */}
+      {activeSessions.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #eee", padding: 16, marginBottom: 20 }}>
+          <h3 style={{ margin: "0 0 14px 0", color: "#333" }}>Active Sessions ({activeSessions.length})</h3>
+          <div style={{ display: "grid", gap: 10 }}>
+            {activeSessions.map((s) => (
+              <SessionCard key={s.id} session={s} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* closed session table */}
+      {closedSessions.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #eee", padding: 16 }}>
+          <h3 style={{ margin: "0 0 14px 0", color: "#333" }}>Closed Sessions ({closedSessions.length})</h3>
+          <div style={{ overflowX: "auto", marginTop: 10 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f8f9fa" }}>
+                  <th style={tableHeaderStyle()}>ID</th>
+                  <th style={tableHeaderStyle()}>Cashier</th>
+                  <th style={tableHeaderStyle()}>Allocated By</th>
+                  <th style={tableHeaderStyle()}>Allocated</th>
+                  <th style={tableHeaderStyle()}>Expected</th>
+                  <th style={tableHeaderStyle()}>Counted</th>
+                  <th style={tableHeaderStyle()}>Variance</th>
+                  <th style={tableHeaderStyle()}>Closed At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {closedSessions.map((s) => (
+                  <tr key={s.id} style={{ borderBottom: "1px solid #eee" }}>
+                    <td style={tableCellStyle()}>{s.id}</td>
+                    <td style={tableCellStyle()}>{s.cashier?.username || s.cashier?.first_name}</td>
+                    <td style={tableCellStyle()}>{s.allocated_by?.username || '-'}
+                    </td>
+                    <td style={tableCellStyle()}>{s.opening_amount}</td>
+                    <td style={tableCellStyle()}>{s.expected_closing_amount ?? '-'}</td>
+                    <td style={tableCellStyle()}>{s.counted_closing_amount ?? '-'}</td>
+                    <td style={tableCellStyle()}>{s.variance_amount ?? '-'}</td>
+                    <td style={tableCellStyle()}>{s.closed_at ? new Date(s.closed_at).toLocaleString() : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -178,5 +250,74 @@ export default function CashAllocationPage() {
       fontSize: 14,
     };
   }
+
+  function tableHeaderStyle() {
+    return { border: "1px solid #ddd", padding: "8px", textAlign: "left" };
+  }
+
+  function tableCellStyle() {
+    return { border: "1px solid #ddd", padding: "8px" };
+  }
+}
+
+// Card and SessionCard definitions
+function Card({ label, count, color }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid rgba(15,23,42,0.08)", padding: 16 }}>
+      <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color }}>{count}</div>
+    </div>
+  );
+}
+
+function SessionCard({ session, closed }) {
+  const statusColor = session.status === "ALLOCATED" ? "#f59e0b" : session.status === "ACTIVE" ? "#10b981" : "#6b7280";
+  let cashierName;
+  if (session.cashier?.first_name) {
+    cashierName = session.cashier.first_name + " " + session.cashier.last_name;
+  } else {
+    cashierName = session.cashier?.username || "Unknown";
+  }
+
+  return (
+    <div style={{ border: "1px solid #eee", borderRadius: 8, padding: 12, background: "#f9fafb" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 700, color: "#333", marginBottom: 4 }}>
+            Session #{session.id}
+          </div>
+          <div style={{ fontSize: 13, color: "#475569", marginBottom: 2 }}>
+            Cashier: <strong>{cashierName}</strong>
+          </div>
+          <div style={{ fontSize: 13, color: "#475569" }}>
+            Opening Amount: <strong>{parseFloat(session.opening_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+          </div>
+          {session.confirmed_opening_amount && (
+            <div style={{ fontSize: 13, color: "#475569", marginTop: 2 }}>
+              Confirmed: <strong>{parseFloat(session.confirmed_opening_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+            </div>
+          )}
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div
+            style={{
+              display: "inline-block",
+              padding: "4px 10px",
+              borderRadius: 6,
+              background: statusColor,
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {session.status}
+          </div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 8 }}>
+            {new Date(session.allocated_at).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 

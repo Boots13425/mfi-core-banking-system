@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axios';
+import { useAuth } from '../auth/useAuth';
 
 export const TellerSessionManager = ({ onSessionReady }) => {
+  const { user } = useAuth();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,7 +17,8 @@ export const TellerSessionManager = ({ onSessionReady }) => {
     try {
       const res = await axiosInstance.get('/cash/sessions/my_active/');
       setSession(res.data);
-      // If session is ACTIVE, notify parent
+      setLoading(false);
+      // If session is ACTIVE, notify parent and stop showing the loading UI
       if (res.data.status === 'ACTIVE' && onSessionReady) {
         onSessionReady(res.data);
       }
@@ -41,9 +44,17 @@ export const TellerSessionManager = ({ onSessionReady }) => {
     }
   };
 
+  // Re-fetch when user logs out and logs back in (user object changes)
   useEffect(() => {
-    fetchSession();
-  }, []);
+    if (user?.id) {
+      fetchSession();
+      // Fallback: if loading takes too long (e.g., API delay), stop showing loading UI after 5s
+      const timeoutId = setTimeout(() => {
+        setLoading(false);
+      }, 5000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [user?.id]);
 
   const handleConfirmOpening = async () => {
     if (!countedAmount) {
