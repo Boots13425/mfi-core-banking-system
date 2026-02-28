@@ -67,6 +67,9 @@ export const DashboardPage = () => {
             <button onClick={() => navigate('/branch-manager/loans')} style={cardBtn('#111')}>
               Loan Approvals
             </button>
+           <button onClick={() => navigate('/branch-manager/savings/withdrawals')} style={cardBtn('#007bff')}>
+  Savings Withdrawal Approvals
+</button>
           </>
         )}
 
@@ -75,10 +78,16 @@ export const DashboardPage = () => {
               <button onClick={() => navigate('/cashier/loan-management')} style={cardBtn('#007bff')}>
                 Loan Management
               </button>
-              <button onClick={() => navigate('/cashier/loans')} style={cardBtn('#111')}>
+              <button onClick={() => navigate('/cashier/savings')} style={cardBtn('#3440e6')}>
+  Manage Savings Accounts
+</button>
+               <button onClick={() => navigate('/cashier/loans')} style={cardBtn('#111')}>
                 Loan Disbursement
               </button>
+              {/* saving button */}
+              
             </>
+
   )}
       </div>
 

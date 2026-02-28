@@ -13,15 +13,26 @@ import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { ClientListPage } from './pages/ClientListPage';
 import { ClientRegistrationPage } from './pages/ClientRegistrationPage';
 import { ClientProfilePage } from './pages/ClientProfilePage';
-
 import LoanOfficerClientsPage from './pages/LoanOfficerClientsPage';
 import LoanOfficerClientLoanContextPage from './pages/LoanOfficerClientLoanContextPage';
+import { SavingsWithdrawalApprovalsPage } from './pages/SavingsWithdrawalApprovalsPage';
+
+// Wire routes for the saving management
+import { SavingsProductsPage } from './pages/SavingsProductsPage';
+import { ClientSavingsPage } from './pages/ClientSavingsPage';
+import { SavingsAccountDetailPage } from './pages/SavingsAccountDetailPage';
+import { CashierSavingsClientsPage } from './pages/CashierSavingsClientsPage';
+
+
+
+
+// other lazily referenced pages that are default exports
 import LoanManagementPage from './pages/LoanManagementPage';
 import BranchManagerLoanQueuePage from './pages/BranchManagerLoanQueuePage';
 import BranchManagerLoanDetailPage from './pages/BranchManagerLoanDetailPage';
 import CashierLoanQueuePage from './pages/CashierLoanQueuePage';
-import CashierDisbursementPage from './pages/CashierDisbursementPage';
 import CashierLoanManagementClientsPage from './pages/CashierLoanManagementClientsPage';
+import CashierDisbursementPage from './pages/CashierDisbursementPage';
 
 import axiosInstance from './api/axios';
 
@@ -304,6 +315,76 @@ const AppRoutes = () => {
       </RequireAuth>
     }
   />
+    <Route
+    path="/cashier/saving-management"
+    element={
+      <RequireAuth>
+        <RequireRole role="BRANCH_MANAGER">
+          < SavingsWithdrawalApprovalsPage />
+        </RequireRole>
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/cashier/savings"
+    element={
+      <RequireAuth>
+          <RequireRole roles={["CASHIER", "BRANCH_MANAGER", "SUPER_ADMIN"]}>
+          <CashierSavingsClientsPage />
+        </RequireRole>
+      </RequireAuth>
+    }
+  />
+
+{/* =========================
+    SAVINGS ROUTES
+   ========================= */}
+
+<Route
+  path="/super-admin/savings-products"
+  element={
+    <RequireAuth>
+      <RequireRole role="SUPER_ADMIN">
+        <SavingsProductsPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
+
+<Route
+  path="/clients/:clientId/savings"
+  element={
+    <RequireAuth>
+      <RequireRole roles={['CASHIER', 'BRANCH_MANAGER', 'SUPER_ADMIN']}>
+        <ClientSavingsPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
+
+<Route
+  path="/savings/accounts/:accountId"
+  element={
+    <RequireAuth>
+      <RequireRole roles={['CASHIER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'LOAN_OFFICER']}>
+        <SavingsAccountDetailPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
+
+{/* Alias route for approvals (keep your existing one too) */}
+<Route
+  path="/branch-manager/savings/withdrawals"
+  element={
+    <RequireAuth>
+      <RequireRole roles={['BRANCH_MANAGER', 'SUPER_ADMIN']}>
+        <SavingsWithdrawalApprovalsPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
+  
 
   <Route
     path="/cashier/loan-management"
