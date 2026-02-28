@@ -21,6 +21,11 @@ from .serializers import (
     DepositSerializer,
     WithdrawSerializer,
 )
+from django.core.exceptions import ValidationError
+from cash.hooks import (
+    record_cash_savings_deposit,
+    record_cash_savings_withdrawal,
+)
 
 
 def _user_is_super_admin(user) -> bool:
@@ -215,6 +220,7 @@ class SavingsAccountViewSet(viewsets.ViewSet):
             posted_by=request.user,
             reference=data.get("reference") or "",
             narration=data.get("narration") or "",
+            payment_method=data.get("payment_method"),
         )
 
         try:
@@ -226,6 +232,15 @@ class SavingsAccountViewSet(viewsets.ViewSet):
                 summary=f"Deposit {tx.amount} posted to {account.account_number}",
                 ip_address=get_client_ip(request),
             )
+        except Exception:
+            pass
+
+        # If deposit was by cash, record cash inflow
+        try:
+            if (data.get('payment_method') or '').upper() == 'CASH':
+                record_cash_savings_deposit(request_user=request.user, amount=tx.amount, savings_tx_id=tx.id)
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception:
             pass
 
@@ -284,6 +299,7 @@ class SavingsAccountViewSet(viewsets.ViewSet):
             posted_by=request.user,
             reference=data.get("reference") or "",
             narration=data.get("narration") or "",
+            payment_method=data.get("payment_method"),
         )
 
         action_code = "SAVINGS_WITHDRAWAL_REQUESTED" if requires_approval else "SAVINGS_WITHDRAWAL_POSTED"
@@ -301,8 +317,16 @@ class SavingsAccountViewSet(viewsets.ViewSet):
 
         # For instant posted withdrawals, enforce ledger update by marking status POSTED now
         if not requires_approval:
-            # nothing extra to do; balance derived from POSTED tx
-            pass
+            # if payment was by cash, record cash outflow now
+            try:
+                if (data.get('payment_method') or '').upper() == 'CASH':
+                    record_cash_savings_withdrawal(request_user=request.user, amount=tx.amount, savings_tx_id=tx.id)
+            except ValidationError as e:
+                # If cash session missing, surface a clear error
+                return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception:
+                # don't block the API for cash subsystem failures; log and continue
+                pass
 
         return Response(SavingsTransactionSerializer(tx).data, status=status.HTTP_201_CREATED)
 
@@ -447,6 +471,17 @@ def branch_manager_approve_withdrawal(request, tx_id: int):
             summary=f"Savings withdrawal {tx.amount} approved for account {account.account_number}",
             ip_address=get_client_ip(request),
         )
+    except Exception:
+        pass
+
+    # If this withdrawal was requested as CASH, record the cash outflow now (use the original posted_by user/session)
+    try:
+        if (getattr(tx, 'payment_method', '') or '').upper() == 'CASH':
+            # use the user who initiated the transaction to locate their cash session
+            initiating_user = tx.posted_by or request.user
+            record_cash_savings_withdrawal(request_user=initiating_user, amount=tx.amount, savings_tx_id=tx.id)
+    except ValidationError as e:
+        return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception:
         pass
 

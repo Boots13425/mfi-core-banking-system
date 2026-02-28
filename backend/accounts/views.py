@@ -534,6 +534,19 @@ class UserViewSet(viewsets.ModelViewSet):
         )
         
         return Response(UserSerializer(user).data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def branch_cashiers(self, request):
+        """Get cashiers in the requesting user's branch (for branch managers)"""
+        user = request.user
+        branch_id = getattr(user, 'branch_id', None)
+        
+        if not branch_id:
+            return Response({'detail': 'User must belong to a branch.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        cashiers = User.objects.filter(branch_id=branch_id, role='CASHIER', is_active=True).order_by('first_name', 'last_name')
+        serializer = UserSerializer(cashiers, many=True)
+        return Response(serializer.data)
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Audit logs (Super Admin only)"""

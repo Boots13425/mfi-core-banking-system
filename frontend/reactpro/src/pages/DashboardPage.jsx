@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { TellerSessionManager } from '../components/TellerSessionManager';
 
 export const DashboardPage = () => {
   const { user, logout } = useAuth();
@@ -34,6 +35,9 @@ export const DashboardPage = () => {
         </p>
       </div>
 
+      {/* Show teller session manager for cashiers */}
+      {user?.role === 'CASHIER' && <TellerSessionManager />}
+
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '18px' }}>
         {user?.role === 'SUPER_ADMIN' && (
           <button onClick={() => navigate('/super-admin')} style={cardBtn('#28a745')}>
@@ -52,6 +56,12 @@ export const DashboardPage = () => {
                 Register New Client
               </button>
             )}
+
+            {user?.role === 'BRANCH_MANAGER' && (
+              <button onClick={() => navigate('/cash/allocation')} style={cardBtn('#6f42c1')}>
+                Allocate Cash to Cashier
+              </button>
+            )}
           </>
         )}
 
@@ -61,15 +71,14 @@ export const DashboardPage = () => {
           </button>
         )}
 
-        {/* ✅ NEW: Branch manager gets an obvious entry point to loan approvals */}
         {user?.role === 'BRANCH_MANAGER' && (
           <>
             <button onClick={() => navigate('/branch-manager/loans')} style={cardBtn('#111')}>
               Loan Approvals
             </button>
-           <button onClick={() => navigate('/branch-manager/savings/withdrawals')} style={cardBtn('#007bff')}>
-  Savings Withdrawal Approvals
-</button>
+            <button onClick={() => navigate('/branch-manager/savings/withdrawals')} style={cardBtn('#007bff')}>
+              Savings Withdrawal Approvals
+            </button>
           </>
         )}
 

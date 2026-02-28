@@ -1,50 +1,45 @@
-import axios from "axios";
+// cashApi.js
+// Shared instance ensures authorization headers and refresh logic are applied
+// consistently across the app. Previous version duplicated functions and used
+// a separate axios instance with a mismatched storage key for the token.
 
-const API_BASE = import.meta.env.VITE_MAIN_API || "/api";
+import axiosInstance from './axios';
 
-export const cashApi = axios.create({
-  baseURL: API_BASE,
-});
-
-// Optional: attach token if you store it in localStorage
-cashApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+// expose underlying instance in case other modules expect `cashApi`
+export const cashApi = axiosInstance;
 
 export async function allocateCashToCashier(payload) {
-  // POST /api/cash/sessions/allocate/
-  const res = await cashApi.post("/cash/sessions/allocate/", payload);
+  const res = await axiosInstance.post('/cash/sessions/allocate/', payload);
   return res.data;
 }
 
 export async function listMySessions() {
-  const res = await cashApi.get("/cash/sessions/");
+  const res = await axiosInstance.get('/cash/sessions/');
   return res.data;
 }
 
 export async function getMyActiveSession() {
-  const res = await cashApi.get("/cash/sessions/my_active/");
+  const res = await axiosInstance.get('/cash/sessions/my_active/');
   return res.data;
 }
 
 export async function confirmSessionOpening(sessionId, payload) {
-  const res = await cashApi.post(`/cash/sessions/${sessionId}/confirm_opening/`, payload);
+  const res = await axiosInstance.post(`/cash/sessions/${sessionId}/confirm_opening/`, payload);
   return res.data;
 }
 
 export async function closeSession(sessionId, payload) {
-  const res = await cashApi.post(`/cash/sessions/${sessionId}/close/`, payload);
+  const res = await axiosInstance.post(`/cash/sessions/${sessionId}/close/`, payload);
   return res.data;
 }
 
 export async function reviewSession(sessionId, payload) {
-  const res = await cashApi.post(`/cash/sessions/${sessionId}/review/`, payload);
+  const res = await axiosInstance.post(`/cash/sessions/${sessionId}/review/`, payload);
   return res.data;
 }
 
 export async function listLedger(params = {}) {
-  const res = await cashApi.get("/cash/ledger/", { params });
+  const res = await axiosInstance.get('/cash/ledger/', { params });
   return res.data;
 }
+

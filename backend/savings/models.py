@@ -133,6 +133,13 @@ class SavingsTransaction(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
 
     reference = models.CharField(max_length=64, null=True, blank=True)
+    PAYMENT_METHODS = (
+        ("CASH", "Cash"),
+        ("BANK_TRANSFER", "Bank Transfer"),
+        ("MOBILE_MONEY", "Mobile Money"),
+        ("CHECK", "Check"),
+    )
+    payment_method = models.CharField(max_length=32, choices=PAYMENT_METHODS, null=True, blank=True)
     narration = models.CharField(max_length=255, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

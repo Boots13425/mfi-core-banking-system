@@ -14,6 +14,7 @@ import {
 
 // component used by cashiers on this page
 import { ClientSavingsSection } from "../components/ClientSavingsSection";
+import { TellerSessionManager } from "../components/TellerSessionManager";
 import ClientAvatar from '../components/ClientAvatar';
 
 export const ClientSavingsPage = () => {
@@ -117,7 +118,7 @@ export const ClientSavingsPage = () => {
     const amount = prompt("Enter deposit amount:");
     if (!amount) return;
     try {
-      await depositToSavingsAccount(accountId, { amount, narration: "Deposit" });
+      await depositToSavingsAccount(accountId, { amount, narration: "Deposit", payment_method: 'CASH' });
       alert("Deposit posted.");
       await load();
     } catch (e) {
@@ -129,7 +130,7 @@ export const ClientSavingsPage = () => {
     const amount = prompt("Enter withdrawal amount:");
     if (!amount) return;
     try {
-      const res = await withdrawFromSavingsAccount(accountId, { amount, narration: "Withdrawal" });
+      const res = await withdrawFromSavingsAccount(accountId, { amount, narration: "Withdrawal", payment_method: 'CASH' });
       if (res?.status === "PENDING") {
         alert("Withdrawal is pending approval (large amount).");
       } else {
@@ -180,6 +181,10 @@ export const ClientSavingsPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Show teller session manager for cashiers */}
+      {user?.role === 'CASHIER' && <TellerSessionManager />}
+
       {renderCashierSavingsSection()}
 
       {error && (

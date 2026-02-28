@@ -54,7 +54,7 @@ export const SavingsAccountDetailPage = () => {
     const amount = prompt("Enter deposit amount:");
     if (!amount) return;
     try {
-      await depositToSavingsAccount(accountId, { amount, narration: "Deposit" });
+      await depositToSavingsAccount(accountId, { amount, narration: "Deposit", payment_method: 'CASH' });
       alert("Deposit posted.");
       await load();
     } catch (err) {
@@ -66,7 +66,7 @@ export const SavingsAccountDetailPage = () => {
     const amount = prompt("Enter withdrawal amount:");
     if (!amount) return;
     try {
-      const res = await withdrawFromSavingsAccount(accountId, { amount, narration: "Withdrawal" });
+      const res = await withdrawFromSavingsAccount(accountId, { amount, narration: "Withdrawal", payment_method: 'CASH' });
       if (res?.status === "PENDING") alert("Withdrawal is pending approval (large amount).");
       else alert("Withdrawal posted.");
       await load();

@@ -476,6 +476,7 @@ const DepositWithdrawForm = ({ mode, account, onClose, onSuccess }) => {
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [narration, setNarration] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -489,9 +490,9 @@ const DepositWithdrawForm = ({ mode, account, onClose, onSuccess }) => {
     setSaving(true);
     try {
       if (mode === 'deposit') {
-        await depositToSavingsAccount(account.id, { amount, reference, narration });
+        await depositToSavingsAccount(account.id, { amount, reference, narration, payment_method: paymentMethod });
       } else {
-        await withdrawFromSavingsAccount(account.id, { amount, reference, narration });
+        await withdrawFromSavingsAccount(account.id, { amount, reference, narration, payment_method: paymentMethod });
       }
       await onSuccess();
       onClose();
@@ -559,6 +560,21 @@ const DepositWithdrawForm = ({ mode, account, onClose, onSuccess }) => {
             borderRadius: '4px',
           }}
         />
+      </div>
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Payment Method</label>
+        <select
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+          }}
+        >
+          <option value="CASH">Cash</option>
+        </select>
       </div>
       <button
         type="submit"

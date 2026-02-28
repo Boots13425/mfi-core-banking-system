@@ -22,6 +22,11 @@ from .serializers import (
 from .permissions import IsLoanOfficer, IsBranchManager, IsCashier
 from clients.models import Client, KYC, KYCDocument
 from accounts.models import AuditLog
+from django.core.exceptions import ValidationError
+from cash.hooks import (
+    record_cash_loan_disbursement,
+    record_cash_loan_repayment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -670,6 +675,15 @@ class LoanViewSet(viewsets.ModelViewSet):
             )
         except Exception:
             pass
+
+        # If repayment was by cash, post cash inflow
+        try:
+            if (transaction.payment_method or '').upper() == 'CASH':
+                record_cash_loan_repayment(request_user=request.user, amount=transaction.amount, repayment_tx_id=transaction.id)
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            pass
         
         from .serializers import RepaymentTransactionSerializer
         return Response(
@@ -914,6 +928,15 @@ class CashierLoanViewSet(viewsets.ViewSet):
                 target_id=str(loan.id),
                 summary=f"Loan {loan.id} disbursed via {loan.disbursement_method}",
             )
+        except Exception:
+            pass
+
+        # If disbursed in cash, record cash outflow
+        try:
+            if (loan.disbursement_method or '').upper() == 'CASH':
+                record_cash_loan_disbursement(request_user=request.user, amount=loan.amount, loan_id=loan.id)
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception:
             pass
         
