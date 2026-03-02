@@ -32,6 +32,31 @@ from accounts.utils import create_audit_log
 
 User = get_user_model()
 
+def get_client_ip(request):
+    """
+    Return the best-effort client IP address.
+    Works with common reverse proxies (Nginx), Cloudflare, etc.
+    """
+    meta = getattr(request, "META", {}) or {}
+
+    # Cloudflare
+    ip = meta.get("HTTP_CF_CONNECTING_IP")
+    if ip:
+        return ip.strip()
+
+    # Standard proxy header (may contain multiple IPs: client, proxy1, proxy2...)
+    xff = meta.get("HTTP_X_FORWARDED_FOR")
+    if xff:
+        return xff.split(",")[0].strip()
+
+    # Nginx / some proxies
+    ip = meta.get("HTTP_X_REAL_IP")
+    if ip:
+        return ip.strip()
+
+    # Direct connection
+    ip = meta.get("REMOTE_ADDR")
+    return (ip or "").strip()
 
 class BranchVaultViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsCashierOrBranchManager]
