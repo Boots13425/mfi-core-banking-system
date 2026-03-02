@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import axiosInstance from '../api/axios';
+import PhotoCapture from '../components/PhotoCapture';
 
 export const ClientProfilePage = () => {
   const { id } = useParams();
@@ -26,7 +27,6 @@ export const ClientProfilePage = () => {
   const [kycSuccess, setKycSuccess] = useState(null);
   const [nationalIdFiles, setNationalIdFiles] = useState([]);
   const [proofOfAddressFiles, setProofOfAddressFiles] = useState([]);
-  const [photoFiles, setPhotoFiles] = useState([]);
   const [otherFiles, setOtherFiles] = useState([]);
 
   useEffect(() => {
@@ -89,8 +89,8 @@ export const ClientProfilePage = () => {
   const handleDocumentUpload = async (e) => {
     e.preventDefault();
     
-    // Check if at least one file is selected
-    const totalFiles = nationalIdFiles.length + proofOfAddressFiles.length + photoFiles.length + otherFiles.length;
+    // Check if at least one file is selected (photo is handled separately by PhotoCapture)
+    const totalFiles = nationalIdFiles.length + proofOfAddressFiles.length + otherFiles.length;
     if (totalFiles === 0) {
       setKycError('Please select at least one file to upload');
       return;
@@ -102,15 +102,12 @@ export const ClientProfilePage = () => {
 
     const formData = new FormData();
     
-    // Append all files for each document type
+    // Append all files for each document type (photo is handled by PhotoCapture component)
     nationalIdFiles.forEach((file) => {
       formData.append('national_id', file);
     });
     proofOfAddressFiles.forEach((file) => {
       formData.append('proof_of_address', file);
-    });
-    photoFiles.forEach((file) => {
-      formData.append('photo', file);
     });
     otherFiles.forEach((file) => {
       formData.append('other', file);
@@ -129,7 +126,6 @@ export const ClientProfilePage = () => {
       // Clear all file inputs
       setNationalIdFiles([]);
       setProofOfAddressFiles([]);
-      setPhotoFiles([]);
       setOtherFiles([]);
       
       // Reset file inputs
@@ -657,30 +653,16 @@ export const ClientProfilePage = () => {
                       )}
                     </div>
 
-                    {/* Photo */}
+                    {/* Photo - Using PhotoCapture Component */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
-                        Client Photos
-                      </label>
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => setPhotoFiles(Array.from(e.target.files))}
-                        accept="image/*"
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          fontSize: '14px',
-                          boxSizing: 'border-box',
+                      <PhotoCapture
+                        clientId={id}
+                        onPhotoUploaded={() => {
+                          setKycSuccess('Photo uploaded successfully!');
+                          // Refresh KYC data to reflect new photo
+                          setTimeout(() => fetchKYC(), 500);
                         }}
                       />
-                      {photoFiles.length > 0 && (
-                        <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#28a745' }}>
-                          {photoFiles.length} file(s) selected
-                        </p>
-                      )}
                     </div>
 
                     {/* Other Documents */}
@@ -712,14 +694,14 @@ export const ClientProfilePage = () => {
                   
                   <button
                     type="submit"
-                    disabled={uploadingDocument || (nationalIdFiles.length === 0 && proofOfAddressFiles.length === 0 && photoFiles.length === 0 && otherFiles.length === 0)}
+                    disabled={uploadingDocument || (nationalIdFiles.length === 0 && proofOfAddressFiles.length === 0 && otherFiles.length === 0)}
                     style={{
                       padding: '12px 24px',
-                      background: uploadingDocument || (nationalIdFiles.length === 0 && proofOfAddressFiles.length === 0 && photoFiles.length === 0 && otherFiles.length === 0) ? '#6c757d' : '#28a745',
+                      background: uploadingDocument || (nationalIdFiles.length === 0 && proofOfAddressFiles.length === 0 && otherFiles.length === 0) ? '#6c757d' : '#28a745',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      cursor: uploadingDocument || (nationalIdFiles.length === 0 && proofOfAddressFiles.length === 0 && photoFiles.length === 0 && otherFiles.length === 0) ? 'not-allowed' : 'pointer',
+                      cursor: uploadingDocument || (nationalIdFiles.length === 0 && proofOfAddressFiles.length === 0 && otherFiles.length === 0) ? 'not-allowed' : 'pointer',
                       fontWeight: 'bold',
                       fontSize: '16px',
                     }}

@@ -4,9 +4,7 @@
  * Handles communication with Django backend for photo uploads.
  */
 
-import axios from 'axios';
-
-const API_BASE_URL = '/api/clients';
+import axiosInstance from './axios';
 
 /**
  * Upload a client photo using FormData (multipart)
@@ -21,8 +19,8 @@ export async function uploadClientPhotoFile(clientId, photoFile) {
   formData.append('photo', photoFile);
 
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/${clientId}/upload-photo/`,
+    const response = await axiosInstance.post(
+      `/clients/${clientId}/kyc/upload-documents/`,
       formData,
       {
         headers: {
@@ -61,7 +59,7 @@ export async function uploadClientPhotoDataUrl(clientId, dataUrl) {
  */
 export async function getClientPhoto(clientId) {
   try {
-    const response = await axios.get(`${API_BASE_URL}/${clientId}/`);
+    const response = await axiosInstance.get(`/clients/${clientId}/`);
     return response.data;
   } catch (error) {
     const message = error.response?.data?.detail || 'Failed to fetch client';

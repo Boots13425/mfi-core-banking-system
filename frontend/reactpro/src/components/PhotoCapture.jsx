@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { capturePhoto } from '../utils/camera';
 import { processImage } from '../utils/imageProcessor';
 import { uploadClientPhotoFile } from '../api/photoApi';
-import './PhotoCapture.css';
 
 /**
  * PhotoCapture Component
  *
  * Dual-mode UI for adding client photos:
  * 1. Upload from desktop (file picker)
- * 2. Capture from camera (currently placeholder, future SDK integration)
+ * 2. Capture from camera
  *
  * Props:
  *   - clientId (required): Client ID for photo upload
@@ -26,9 +25,6 @@ export default function PhotoCapture({ clientId, onPhotoUploaded }) {
     setSuccess('');
   };
 
-  /**
-   * Handle file selection from desktop
-   */
   const handleFileUpload = async (evt) => {
     resetMessages();
 
@@ -49,9 +45,6 @@ export default function PhotoCapture({ clientId, onPhotoUploaded }) {
     }
   };
 
-  /**
-   * Handle photo capture from camera
-   */
   const handleCapture = async () => {
     resetMessages();
 
@@ -59,19 +52,13 @@ export default function PhotoCapture({ clientId, onPhotoUploaded }) {
       setIsLoading(true);
       const capturedImage = await capturePhoto();
       setPreview(capturedImage);
-      setSuccess('Photo captured. Click Submit to save.');
     } catch (err) {
-      setError(
-        err.message || 'Camera capture failed. Please use upload instead.'
-      );
+      setError(err.message || 'Camera capture failed. Please use upload instead.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Submit the photo to the backend
-   */
   const handleSubmit = async () => {
     if (!preview) {
       setError('No photo selected');
@@ -112,9 +99,6 @@ export default function PhotoCapture({ clientId, onPhotoUploaded }) {
     }
   };
 
-  /**
-   * Cancel and clear preview
-   */
   const handleCancel = () => {
     setPreview(null);
     resetMessages();
@@ -125,58 +109,90 @@ export default function PhotoCapture({ clientId, onPhotoUploaded }) {
     }
   };
 
+  // Shared button style
+  const buttonStyle = (bgColor, disabled) => ({
+    padding: '10px 16px',
+    background: disabled ? '#6c757d' : bgColor,
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+  });
+
   return (
-    <div className="photo-capture">
-      <h2>Client Photo</h2>
+    <div style={{ marginBottom: '20px' }}>
+      {/* Label */}
+      <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+        Client Photo
+      </label>
 
-      {/* Action Buttons */}
-      <div className="photo-capture__actions">
-        <button
-          className="photo-capture__button photo-capture__button--primary"
-          onClick={handleCapture}
-          disabled={isLoading}
-          title="Capture photo using camera"
-        >
-          📷 Capture Photo
-        </button>
+      {/* Help text */}
+      <p style={{ margin: '0 0 12px 0', color: '#666', fontSize: '13px' }}>
+        Take a photo using your camera or upload from your computer.
+      </p>
 
-        <label className="photo-capture__file-label">
-          <input
-            id="photo-file-input"
-            type="file"
-            accept="image/jpeg,image/png"
-            onChange={handleFileUpload}
+      {/* Action Buttons - Two column layout */}
+      {!preview && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+          <button
+            onClick={handleCapture}
             disabled={isLoading}
-            className="photo-capture__file-input"
-          />
-          <span className="photo-capture__button photo-capture__button--primary">
-            📁 Upload from Desktop
-          </span>
-        </label>
-      </div>
+            style={buttonStyle('#007bff', isLoading)}
+            title="Use device camera to capture photo"
+          >
+            📷 Capture
+          </button>
 
-      {/* Preview and Submit Section */}
+          <label style={{ cursor: 'pointer' }}>
+            <input
+              id="photo-file-input"
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleFileUpload}
+              disabled={isLoading}
+              style={{ display: 'none' }}
+            />
+            <span style={buttonStyle('#007bff', isLoading)}>
+              📁 Upload
+            </span>
+          </label>
+        </div>
+      )}
+
+      {/* Preview Section */}
       {preview && (
-        <div className="photo-capture__preview-section">
-          <h3>Preview</h3>
+        <div style={{ marginBottom: '12px' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#666', fontSize: '13px', fontWeight: '500' }}>
+            Photo Preview
+          </p>
           <img
             src={preview}
-            alt="Preview"
-            className="photo-capture__preview-image"
+            alt="Photo preview"
+            style={{
+              width: '100%',
+              maxHeight: '250px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              objectFit: 'contain',
+              marginBottom: '12px',
+              backgroundColor: '#f5f5f5',
+            }}
           />
 
-          <div className="photo-capture__preview-actions">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <button
-              className="photo-capture__button photo-capture__button--success"
               onClick={handleSubmit}
               disabled={isLoading}
+              style={buttonStyle('#28a745', isLoading)}
             >
-              {isLoading ? 'Uploading...' : '✓ Submit'}
+              {isLoading ? 'Saving...' : '✓ Save'}
             </button>
             <button
-              className="photo-capture__button photo-capture__button--cancel"
               onClick={handleCancel}
               disabled={isLoading}
+              style={buttonStyle('#6c757d', isLoading)}
             >
               ✕ Cancel
             </button>
@@ -184,15 +200,32 @@ export default function PhotoCapture({ clientId, onPhotoUploaded }) {
         </div>
       )}
 
-      {/* Messages */}
+      {/* Error Message */}
       {error && (
-        <div className="photo-capture__message photo-capture__message--error">
+        <div style={{
+          background: '#f8d7da',
+          border: '1px solid #f5c6cb',
+          color: '#721c24',
+          padding: '10px 12px',
+          borderRadius: '4px',
+          fontSize: '13px',
+          marginTop: '8px',
+        }}>
           {error}
         </div>
       )}
 
+      {/* Success Message */}
       {success && (
-        <div className="photo-capture__message photo-capture__message--success">
+        <div style={{
+          background: '#d4edda',
+          border: '1px solid #c3e6cb',
+          color: '#155724',
+          padding: '10px 12px',
+          borderRadius: '4px',
+          fontSize: '13px',
+          marginTop: '8px',
+        }}>
           {success}
         </div>
       )}
