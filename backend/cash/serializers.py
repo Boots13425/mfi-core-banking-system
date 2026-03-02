@@ -1,9 +1,12 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from .models import BranchVault, TellerSession, CashLedgerEntry, TellerSessionStatus
 from .services import compute_expected_drawer_balance
+
+User = get_user_model()
 
 
 class BranchVaultSerializer(serializers.ModelSerializer):
@@ -15,6 +18,9 @@ class BranchVaultSerializer(serializers.ModelSerializer):
 
 class TellerSessionSerializer(serializers.ModelSerializer):
     expected_drawer_balance = serializers.SerializerMethodField()
+    # provide simple nested user info so frontend can display names
+    cashier = serializers.SerializerMethodField()
+    allocated_by = serializers.SerializerMethodField()
 
     class Meta:
         model = TellerSession
@@ -57,6 +63,23 @@ class TellerSessionSerializer(serializers.ModelSerializer):
         if obj.status != TellerSessionStatus.ACTIVE:
             return None
         return str(compute_expected_drawer_balance(obj))
+
+    def _serialize_user_brief(self, user):
+        if not user:
+            return None
+        return {
+            "id": user.id,
+            "username": getattr(user, "username", None),
+            "first_name": getattr(user, "first_name", ""),
+            "last_name": getattr(user, "last_name", ""),
+            "email": getattr(user, "email", None),
+        }
+
+    def get_cashier(self, obj: TellerSession):
+        return self._serialize_user_brief(obj.cashier)
+
+    def get_allocated_by(self, obj: TellerSession):
+        return self._serialize_user_brief(obj.allocated_by)
 
 
 class TellerSessionAllocateSerializer(serializers.Serializer):

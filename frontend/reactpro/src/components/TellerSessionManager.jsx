@@ -11,6 +11,11 @@ export const TellerSessionManager = ({ onSessionReady }) => {
   const [countedAmount, setCountedAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // closing session state
+  const [countedClose, setCountedClose] = useState('');
+  const [varianceNoteClose, setVarianceNoteClose] = useState('');
+  const [closingSubmitting, setClosingSubmitting] = useState(false);
+
   const fetchSession = async () => {
     setLoading(true);
     setError(null);
@@ -105,9 +110,81 @@ export const TellerSessionManager = ({ onSessionReady }) => {
     );
   }
 
-  // Session is ACTIVE - all good, don't show anything
+  // Session is ACTIVE - show close UI so cashier can manually close session
   if (session.status === 'ACTIVE') {
-    return null;
+    const handleCloseSession = async () => {
+      if (countedClose === '') {
+        alert('Please enter counted closing amount.');
+        return;
+      }
+      const v = Number(countedClose);
+      if (Number.isNaN(v) || v < 0) {
+        alert('Enter a valid counted closing amount.');
+        return;
+      }
+      setClosingSubmitting(true);
+      try {
+        const res = await axiosInstance.post(`/cash/sessions/${session.id}/close/`, {
+          counted_closing_amount: v,
+          variance_note: varianceNoteClose || '',
+        });
+        setSession(res.data);
+        // notify parent that session is closed / no active session
+        if (onSessionReady) onSessionReady(null);
+        setCountedClose('');
+        setVarianceNoteClose('');
+        alert('Session closed successfully.');
+      } catch (err) {
+        alert(err?.response?.data?.detail || 'Failed to close session.');
+      } finally {
+        setClosingSubmitting(false);
+      }
+    };
+
+    return (
+      <div
+        style={{
+          padding: '16px',
+          background: '#fff3cd',
+          border: '1px solid #ffeeba',
+          borderRadius: '4px',
+          color: '#856404',
+          marginBottom: '16px',
+        }}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <strong>Active Teller Session</strong>
+          <div>Session #{session.id}</div>
+          <div>Confirmed opening: {session.confirmed_opening_amount}</div>
+          <div>Expected drawer balance: {session.expected_drawer_balance ?? '-'}</div>
+        </div>
+
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={countedClose}
+            onChange={(e) => setCountedClose(e.target.value)}
+            placeholder="Counted closing amount"
+            style={{ padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+          />
+          <input
+            value={varianceNoteClose}
+            onChange={(e) => setVarianceNoteClose(e.target.value)}
+            placeholder="Variance note (optional)"
+            style={{ padding: 8, borderRadius: 6, border: '1px solid #ddd', flex: 1 }}
+          />
+          <button
+            onClick={handleCloseSession}
+            disabled={closingSubmitting}
+            style={{ padding: '8px 12px', background: closingSubmitting ? '#6c757d' : '#dc3545', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+          >
+            {closingSubmitting ? 'Closing...' : 'Close Session'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Session is ALLOCATED - show confirmation prompt

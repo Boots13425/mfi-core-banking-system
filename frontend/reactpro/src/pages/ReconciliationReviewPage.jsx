@@ -86,7 +86,11 @@ export default function ReconciliationReviewPage() {
                   closed.map((s) => (
                     <tr key={s.id}>
                       <Td>#{s.id}</Td>
-                      <Td>{String(s.cashier)}</Td>
+                      <Td>{
+                        s.cashier?.first_name
+                          ? `${s.cashier.first_name} ${s.cashier.last_name}`
+                          : s.cashier?.username || 'Unknown'
+                      }</Td>
                       <Td>{s.confirmed_opening_amount ?? "-"}</Td>
                       <Td>{s.expected_closing_amount ?? "-"}</Td>
                       <Td>{s.counted_closing_amount ?? "-"}</Td>

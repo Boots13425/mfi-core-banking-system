@@ -58,9 +58,14 @@ export const DashboardPage = () => {
             )}
 
             {user?.role === 'BRANCH_MANAGER' && (
-              <button onClick={() => navigate('/cash/allocation')} style={cardBtn('#6f42c1')}>
-                Allocate Cash to Cashier
-              </button>
+              <>
+                <button onClick={() => navigate('/cash/allocation')} style={cardBtn('#6f42c1')}>
+                  Allocate Cash to Cashier
+                </button>
+                <button onClick={() => navigate('/cash/reconciliation')} style={cardBtn('#17a2b8')}>
+                  Reconciliation Review
+                </button>
+              </>
             )}
           </>
         )}
