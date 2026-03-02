@@ -147,6 +147,77 @@ class ClientViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @action(detail=True, methods=['post'], url_path='upload-photo', parser_classes=[MultiPartParser, FormParser])
+    def upload_photo(self, request, pk=None):
+        """
+        Upload or update a client photo.
+        Restricted to JPEG and PNG formats (handled by validators).
+        Cashier or Branch Manager only.
+        """
+        # ✅ Use get_object() so cross-branch IDs cannot be accessed
+        client = self.get_object()
+
+        if request.user.role not in ['CASHIER', 'BRANCH_MANAGER']:
+            return Response(
+                {'detail': 'You do not have permission to upload client photos.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Ensure user can only upload photos for clients in their branch
+        if request.user.role == 'BRANCH_MANAGER' and client.branch != request.user.branch:
+            return Response(
+                {'detail': 'You can only upload photos for clients in your branch.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if 'photo' not in request.FILES:
+            return Response(
+                {'detail': 'No photo file provided.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        photo_file = request.FILES['photo']
+
+        # Validators in the model will check format and size
+        try:
+            old_photo = client.photo
+            client.photo = photo_file
+            client.save()
+
+            # Delete old photo file if it existed and is different
+            if old_photo and old_photo.name != client.photo.name:
+                old_photo.delete(save=False)
+
+            create_audit_log(
+                actor=request.user,
+                action='CLIENT_PHOTO_UPLOADED',
+                target_type='Client',
+                target_id=str(client.client_number),
+                summary=f'Client {client.full_name} photo uploaded by {request.user}',
+                ip_address=get_client_ip(request)
+            )
+
+            serializer = ClientSerializer(client, context={'request': request})
+            return Response(
+                {
+                    'detail': 'Client photo uploaded successfully.',
+                    'client': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except ValueError as e:
+            # Validation errors from validators
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'detail': f'Failed to upload photo: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=True, methods=['post'], url_path='initiate-kyc')
     def initiate_kyc(self, request, pk=None):
         """Initiate KYC for a client (Cashier only)"""

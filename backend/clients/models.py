@@ -3,6 +3,7 @@ import os
 import re
 from django.db import models
 from django.conf import settings
+from .validators import validate_photo_format, validate_photo_size
 
 
 def safe_folder_name(value: str) -> str:
@@ -27,12 +28,26 @@ def kyc_document_upload_path(instance, filename):
     return f'kyc_documents/{instance.kyc.client.id}_{client_name}/{instance.document_type}/{filename}'
 
 
+def client_photo_upload_path(instance, filename):
+    """Generate upload path for client photos"""
+    client_name = ''.join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in instance.full_name)
+    client_name = client_name.strip().replace(' ', '_')
+    return f'client_photos/{instance.id}_{client_name}/{filename}'
+
+
 class Client(models.Model):
     STATUS_CHOICES = [
         ('ACTIVE', 'Active'),
         ('INACTIVE', 'Inactive'),
     ]
-
+    photo = models.ImageField(
+        upload_to=client_photo_upload_path,
+        null=True,
+        blank=True,
+        validators=[validate_photo_format, validate_photo_size],
+        help_text='Client photo (JPEG or PNG, max 5MB)'
+    )
+    
     client_number = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     full_name = models.CharField(max_length=255)
     national_id = models.CharField(max_length=100, null=True, blank=True)

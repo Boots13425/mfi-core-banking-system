@@ -31,16 +31,17 @@ class ClientSerializer(serializers.ModelSerializer):
             'phone',
             'email',
             'address',
+            'photo',
+            'photo_url',
             'status',
-            'branch',          # kept for compatibility (will be an id)
-            'branch_display',  # new: readable label for UI
-            'photo_url',       # client photo for dashboards
+            'branch',
+            'branch_display',
             'created_by',
             'created_at',
             'updated_at',
         ]
         # branch is now read-only so cashier can't set it manually
-        read_only_fields = ('client_number', 'created_by', 'branch', 'created_at', 'updated_at')
+        read_only_fields = ('client_number', 'created_by', 'branch', 'photo_url', 'created_at', 'updated_at')
 
     def get_branch_display(self, obj):
         """
@@ -52,7 +53,13 @@ class ClientSerializer(serializers.ModelSerializer):
         return str(obj.branch)
 
     def get_photo_url(self, obj):
-        """SerializerMethodField helper for photo_url."""
+        """Return absolute URL to client photo if available"""
+        if obj.photo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.photo.url)
+            return obj.photo.url
+        # Fallback to KYC photo if no direct photo
         request = self.context.get('request')
         return _get_client_photo_url(obj, request)
 
