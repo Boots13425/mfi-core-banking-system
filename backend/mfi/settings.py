@@ -28,7 +28,18 @@ SECRET_KEY = 'django-insecure-*k=#3mm_t6p!rw4i*(2bsfhfk-&=a_yg1)^cxjr_#0#b=hl10o
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# during development we permit any host so devices on the same LAN can
+# connect using the machine's IP address.  in production you should narrow
+# this down to your actual hostnames.
+ALLOWED_HOSTS = ["*"]
+
+# allow cross-origin requests from frontend dev server or any origin when
+# DEBUG; this is safe in a local network dev setup.
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    # keep explicit list defined earlier
+    CORS_ALLOW_ALL_ORIGINS = False
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 
