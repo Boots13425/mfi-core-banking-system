@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getLoanDetail, postRepayment } from "../api/loans";
+import { notifyCashSessionChanged } from '../api/cashApi';
 import ClientAvatar from "../components/ClientAvatar"; // Importing ClientAvatar
 import { useAuth } from "../auth/useAuth";
 
@@ -459,6 +460,9 @@ const LoanManagementPage = () => {
         // backend uses server time; we keep date for display only
       };
       await postRepayment(loan.id, payload);
+      if (payload.payment_method === 'CASH') {
+        notifyCashSessionChanged();
+      }
       setShowPaymentModal(false);
       setPaymentTarget(null);
       await fetchLoan();

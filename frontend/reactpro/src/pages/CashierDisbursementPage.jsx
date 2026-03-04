@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLoanDetail, disburseLoan } from '../api/loans';
+import { notifyCashSessionChanged } from '../api/cashApi';
 import ClientAvatar from '../components/ClientAvatar';
 
 const styles = {
@@ -112,6 +113,10 @@ const CashierDisbursementPage = () => {
     try {
       setProcessing(true);
       const data = await disburseLoan(loanId, disbursementData);
+      // notify if cash was used
+      if (disbursementData.disbursement_method === 'CASH') {
+        notifyCashSessionChanged();
+      }
       setLoan(data);
       alert('Loan disbursed successfully! Schedule has been generated.');
       navigate('/cashier/loans');

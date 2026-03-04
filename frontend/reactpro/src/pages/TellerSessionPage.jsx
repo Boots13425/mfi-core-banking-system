@@ -51,6 +51,12 @@ export default function TellerSessionPage() {
 
   useEffect(() => {
     refresh();
+
+    // when other parts of the app post cash transactions we broadcast an
+    // event; listen here so the active session and ledger update automatically
+    const listener = () => refresh();
+    window.addEventListener('cashSessionChanged', listener);
+    return () => window.removeEventListener('cashSessionChanged', listener);
   }, []);
 
   const allocatedSessions = useMemo(

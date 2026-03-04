@@ -439,6 +439,10 @@ const LoanOfficerClientLoanContextPage = () => {
       };
 
       await postRepayment(context.active_loan.id, data);
+      // notify session listener if cashier used cash
+      if (data.payment_method === 'CASH') {
+        notifyCashSessionChanged();
+      }
       setShowRepayment(false);
       setRepaymentFormData({
         amount: "",

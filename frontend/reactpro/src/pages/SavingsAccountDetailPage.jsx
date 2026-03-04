@@ -9,6 +9,7 @@ import {
   depositToSavingsAccount,
   withdrawFromSavingsAccount,
 } from "../api/savings";
+import { notifyCashSessionChanged } from '../api/cashApi';
 
 export const SavingsAccountDetailPage = () => {
   const { user } = useAuth();
@@ -55,6 +56,7 @@ export const SavingsAccountDetailPage = () => {
     if (!amount) return;
     try {
       await depositToSavingsAccount(accountId, { amount, narration: "Deposit", payment_method: 'CASH' });
+      notifyCashSessionChanged();
       alert("Deposit posted.");
       await load();
     } catch (err) {
@@ -67,6 +69,7 @@ export const SavingsAccountDetailPage = () => {
     if (!amount) return;
     try {
       const res = await withdrawFromSavingsAccount(accountId, { amount, narration: "Withdrawal", payment_method: 'CASH' });
+      notifyCashSessionChanged();
       if (res?.status === "PENDING") alert("Withdrawal is pending approval (large amount).");
       else alert("Withdrawal posted.");
       await load();

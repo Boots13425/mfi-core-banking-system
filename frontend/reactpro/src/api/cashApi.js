@@ -8,6 +8,16 @@ import axiosInstance from './axios';
 // expose underlying instance in case other modules expect `cashApi`
 export const cashApi = axiosInstance;
 
+// simple global event for other parts of the app to know when a cash-affecting
+// change has occurred (deposit, withdrawal, repayment, disbursement, etc.).
+// Components that display the active session can listen for the
+// `cashSessionChanged` event and refresh themselves.
+export function notifyCashSessionChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('cashSessionChanged'));
+  }
+}
+
 export async function allocateCashToCashier(payload) {
   const res = await axiosInstance.post('/cash/sessions/allocate/', payload);
   return res.data;

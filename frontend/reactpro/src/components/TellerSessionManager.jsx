@@ -10,6 +10,7 @@ export const TellerSessionManager = ({ onSessionReady }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [countedAmount, setCountedAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmError, setConfirmError] = useState(null);
 
   // closing session state
   const [countedClose, setCountedClose] = useState('');
@@ -57,16 +58,25 @@ export const TellerSessionManager = ({ onSessionReady }) => {
       const timeoutId = setTimeout(() => {
         setLoading(false);
       }, 5000);
-      return () => clearTimeout(timeoutId);
+
+      // also listen for external events (cash transactions elsewhere) and
+      // refresh automatically
+      const handler = () => fetchSession();
+      window.addEventListener('cashSessionChanged', handler);
+      return () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('cashSessionChanged', handler);
+      };
     }
   }, [user?.id]);
 
   const handleConfirmOpening = async () => {
     if (!countedAmount) {
-      alert('Please enter the counted amount.');
+      setConfirmError('Please enter the counted amount.');
       return;
     }
     setSubmitting(true);
+    setConfirmError(null);
     try {
       const res = await axiosInstance.post(`/cash/sessions/${session.id}/confirm_opening/`, {
         counted_opening_amount: countedAmount,
@@ -79,7 +89,9 @@ export const TellerSessionManager = ({ onSessionReady }) => {
         onSessionReady(res.data);
       }
     } catch (err) {
-      alert(err?.response?.data?.detail || 'Failed to confirm opening amount.');
+      const msg = err?.response?.data?.detail || 'Failed to confirm opening amount.';
+      // show mismatch or other validation messages inline
+      setConfirmError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -302,6 +314,9 @@ export const TellerSessionManager = ({ onSessionReady }) => {
                       fontSize: '14px',
                     }}
                   />
+                  {confirmError && (
+                    <div style={{ color: '#c82333', marginTop: 6 }}>{confirmError}</div>
+                  )}
                 </div>
                 <button
                   onClick={handleConfirmOpening}

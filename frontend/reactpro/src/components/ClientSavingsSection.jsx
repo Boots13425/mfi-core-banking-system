@@ -7,6 +7,7 @@ import {
   depositToSavingsAccount,
   withdrawFromSavingsAccount,
 } from '../api/savings';
+import { notifyCashSessionChanged } from '../api/cashApi';
 import { useAuth } from '../auth/useAuth';
 
 export const ClientSavingsSection = ({ clientId, clientStatus, clientKycStatus }) => {
@@ -493,6 +494,10 @@ const DepositWithdrawForm = ({ mode, account, onClose, onSuccess }) => {
         await depositToSavingsAccount(account.id, { amount, reference, narration, payment_method: paymentMethod });
       } else {
         await withdrawFromSavingsAccount(account.id, { amount, reference, narration, payment_method: paymentMethod });
+      }
+      // refresh session if this operation used cash
+      if (paymentMethod === 'CASH') {
+        notifyCashSessionChanged();
       }
       await onSuccess();
       onClose();

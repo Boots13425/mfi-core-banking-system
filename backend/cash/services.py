@@ -22,17 +22,36 @@ def get_active_session_for_cashier(branch, cashier):
 
 def compute_expected_drawer_balance(session: TellerSession) -> Decimal:
     """
-    Expected = confirmed opening + inflows - outflows
+    Expected = confirmed opening + inflows - outflows.
+
+    IMPORTANT: the initial vault-to-drawer allocation entry is recorded when the
+    cashier confirms the opening.  That ledger entry should **not** contribute
+    to the expected balance since the confirmed opening amount already reflects
+    the physical cash in the drawer.  The previous implementation included that
+    entry as an `INFLOW` which caused the drawer balance to double immediately
+    after confirmation.
+
+    By excluding VAULT_TO_DRAWER entries here we ensure the expected balance
+    remains equal to the opening amount until additional operations occur.
+    Similarly, reversal entries are filtered out as before.
     """
     if session.confirmed_opening_amount is None:
         opening = Decimal("0.00")
     else:
         opening = session.confirmed_opening_amount
 
-    inflows = CashLedgerEntry.objects.filter(
-        session=session,
-        direction=CashDirection.INFLOW,
-    ).exclude(event_type=CashEventType.REVERSAL).aggregate_total()
+    # exclude vault allocations from inflows so opening amount isn't double-counted
+    inflows = (
+        CashLedgerEntry.objects.filter(
+            session=session,
+            direction=CashDirection.INFLOW,
+        )
+        .exclude(event_type__in=[
+            CashEventType.REVERSAL,
+            CashEventType.VAULT_TO_DRAWER,
+        ])
+        .aggregate_total()
+    )
 
     outflows = CashLedgerEntry.objects.filter(
         session=session,
@@ -137,6 +156,14 @@ def confirm_session_opening(*, session: TellerSession, cashier, counted_amount: 
     if counted_amount <= 0:
         raise ValidationError("Counted opening amount must be > 0.")
 
+    # enforce manager allocation matches cashier count
+    if session.opening_amount != counted_amount:
+        # do not change session state; caller should surface error to user
+        raise ValidationError(
+            "Counted opening amount does not match allocated amount. "
+            "Session remains pending until amounts agree."
+        )
+
     session.confirmed_opening_amount = counted_amount
     session.confirmed_at = timezone.now()
     session.confirmed_by = cashier
@@ -144,7 +171,9 @@ def confirm_session_opening(*, session: TellerSession, cashier, counted_amount: 
     session.status = TellerSessionStatus.ACTIVE
     session.save()
 
-    # Record the physical movement vault -> drawer
+    # Record the physical movement vault -> drawer.  This entry is for audit and
+    # reconciliation only; it is explicitly ignored by
+    # `compute_expected_drawer_balance` to avoid double counting.
     post_cash_entry(
         branch=session.branch,
         session=session,
