@@ -29,6 +29,8 @@ import CashierDisbursementPage from './pages/CashierDisbursementPage';
 import TellerSessionPage from "./pages/TellerSessionPage.jsx";
 import CashAllocationPage from "./pages/CashAllocationPage.jsx";
 import ReconciliationReviewPage from "./pages/ReconciliationReviewPage.jsx";
+import CashierReportsPage from "./pages/CashierReportsPage.jsx";
+import BranchReportsPage from "./pages/BranchReportsPage.jsx";
 
 
 import axiosInstance from './api/axios';
@@ -266,8 +268,6 @@ const AppRoutes = () => {
       {/* =========================
           BRANCH MANAGER ROUTES
          ========================= */}
-
-      {/* ✅ FIX: this route was missing, so your "Loans(All)" button hit a dead route */}
       <Route
         path="/branch-manager/loans"
         element={
@@ -419,6 +419,31 @@ const AppRoutes = () => {
   path="/cash/reconciliation"
   element={<ReconciliationReviewPage />}
    />
+
+   {/* =========================
+       REPORTS ROUTES
+      ========================= */}
+      <Route
+  path="/cashier/reports"
+  element={
+    <RequireAuth>
+      <RequireRole role="CASHIER">
+        <CashierReportsPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
+
+<Route
+  path="/branch-manager/reports"
+  element={
+    <RequireAuth>
+      <RequireRole role="BRANCH_MANAGER">
+        <BranchReportsPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
 
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
