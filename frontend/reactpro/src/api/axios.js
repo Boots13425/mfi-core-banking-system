@@ -1,13 +1,18 @@
-import axios from 'axios';
+import axios from "axios";
+
+// ✅ Use Vite proxy when available (recommended)
+// - In dev: browser calls http://SERVER_IP:3000/api/... (same origin), Vite proxies to Django
+// - In prod: you can set VITE_API_BASE_URL to your real API domain if needed
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const axiosInstance = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',
+  baseURL: API_BASE,
 });
 
 // Request interceptor - add access token
 axiosInstance.interceptors.request.use(
   (config) => {
-    const accessToken = localStorage.getItem('accessToken');
+    const accessToken = localStorage.getItem("accessToken");
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -26,25 +31,23 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
-        }
+        const refreshToken = localStorage.getItem("refreshToken");
+        if (!refreshToken) throw new Error("No refresh token");
 
-        const response = await axios.post(
-          'http://127.0.0.1:8000/api/auth/refresh/',
-          { refresh: refreshToken }
-        );
+        // ✅ IMPORTANT: do NOT hardcode 127.0.0.1 here.
+        // Use same API base so other devices work too.
+        const plain = axios.create({ baseURL: API_BASE });
+        const response = await plain.post("/auth/refresh/", { refresh: refreshToken });
 
         const newAccessToken = response.data.access;
-        localStorage.setItem('accessToken', newAccessToken);
+        localStorage.setItem("accessToken", newAccessToken);
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        window.location.href = "/login";
         return Promise.reject(refreshError);
       }
     }
