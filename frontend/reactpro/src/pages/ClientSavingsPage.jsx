@@ -88,6 +88,7 @@ export const ClientSavingsPage = () => {
     );
   };
 
+  
   // IMPORTANT: backend enforces status & KYC; frontend mirrors logic for UX
   const isActiveClient =
     client?.status === "ACTIVE" && client?.kyc_status === "APPROVED";
@@ -165,6 +166,7 @@ export const ClientSavingsPage = () => {
           >
             ← Back to Clients
           </button>
+          
 
           <h1 style={{ margin: 0 }}>Client Savings</h1>
 
@@ -187,24 +189,6 @@ export const ClientSavingsPage = () => {
 
       {/* Show teller session manager for cashiers */}
       {user?.role === 'CASHIER' && <TellerSessionManager />}
-
-      {renderCashierSavingsSection()}
-
-      {error && (
-        <div
-          style={{
-            background: "#f8d7da",
-            border: "1px solid #f5c6cb",
-            color: "#721c24",
-            padding: "10px",
-            borderRadius: "4px",
-            marginBottom: "10px",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
       <div style={{ marginBottom: "16px", border: "1px solid #eee", borderRadius: "6px", padding: "12px", display: 'flex', gap: 12, alignItems: 'center' }}>
         {client?.photo_url && (
           <div>
@@ -226,9 +210,28 @@ export const ClientSavingsPage = () => {
           )}
         </div>
       </div>
+      
+      {renderCashierSavingsSection()}
 
-      {/* Open Account */}
-      <div style={{ marginBottom: "16px", border: "1px solid #eee", borderRadius: "6px", padding: "12px" }}>
+      {error && (
+        <div
+          style={{
+            background: "#f8d7da",
+            border: "1px solid #f5c6cb",
+            color: "#721c24",
+            padding: "10px",
+            borderRadius: "4px",
+            marginBottom: "10px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+
+
+      {/* Open Account
+            <div style={{ marginBottom: "16px", border: "1px solid #eee", borderRadius: "6px", padding: "12px" }}>
         <h3 style={{ marginTop: 0 }}>Open Savings Account</h3>
 
         {!canOpenAccount ? (
@@ -281,6 +284,8 @@ export const ClientSavingsPage = () => {
           </form>
         )}
       </div>
+
+      */}
 
       {/* Accounts list */}
       <div style={{ border: "1px solid #eee", borderRadius: "6px", padding: "12px" }}>

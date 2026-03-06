@@ -299,11 +299,6 @@ class LoanViewSet(viewsets.ModelViewSet):
         # Save with all required fields
         # enforce that client belongs to the same branch as the operator
         client = serializer.validated_data.get('client')
-        if client and branch and client.branch_id != branch.id:
-            return Response(
-                {'error': 'Client does not belong to your branch.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         loan = serializer.save(**save_kwargs)
         

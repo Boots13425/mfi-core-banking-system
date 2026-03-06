@@ -32,7 +32,6 @@ ALLOWED_HOSTS = [h.strip() for h in config("ALLOWED_HOSTS", default="127.0.0.1,l
 # during development we permit any host so devices on the same LAN can
 # connect using the machine's IP address.  in production you should narrow
 # this down to your actual hostnames.
-ALLOWED_HOSTS = ["*"]
 
 # allow cross-origin requests from frontend dev server or any origin when
 # DEBUG; this is safe in a local network dev setup.
