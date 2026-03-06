@@ -75,7 +75,7 @@ def summarize_cashbook(session: TellerSession, day=None):
     inflow_total = _sum_by(qs, direction=CashDirection.INFLOW)
     outflow_total = _sum_by(qs, direction=CashDirection.OUTFLOW)
 
-    expected = opening + inflow_total - outflow_total
+    expected = inflow_total - outflow_total
 
     # Breakdown by event type (Cameroon daily pack style)
     inflow_savings = _sum_by(qs, direction=CashDirection.INFLOW, event_type=CashEventType.SAVINGS_DEPOSIT_CASH)

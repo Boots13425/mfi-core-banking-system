@@ -686,7 +686,30 @@ const LoanOfficerClientLoanContextPage = () => {
               )}
             </div>
           </div>
+               {applicationLoan?.status === "CHANGES_REQUESTED" && applicationLoan?.bm_remarks && (
+  <div style={styles.card}>
+    <div style={styles.cardHeader}>
+      <h2 style={styles.cardTitle}>Branch Manager Feedback</h2>
+      <span style={{ ...styles.pill, background: "#fff3cd", borderColor: "#ffeeba", color: "#856404" }}>
+        Changes Requested
+      </span>
+    </div>
 
+    <div
+      style={{
+        background: "#fff3cd",
+        border: "1px solid #ffeeba",
+        color: "#856404",
+        borderRadius: 8,
+        padding: "12px 14px",
+        fontWeight: 700,
+        lineHeight: 1.5,
+      }}
+    >
+      {applicationLoan.bm_remarks}
+    </div>
+  </div>
+)}
           {/* RIGHT: Actions */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={styles.card}>
@@ -724,35 +747,20 @@ const LoanOfficerClientLoanContextPage = () => {
                 </button>
 
                 <button
-                  style={{ ...styles.btn, ...(activeLoan ? styles.btnMuted : { opacity: 0.55, cursor: "not-allowed" }) }}
-                  disabled={!activeLoan}
-                  onClick={() => {
-                    setError(null);
-                    setShowRepayment((v) => !v);
-                    setShowCreateLoan(false);
-                    setShowUploadDoc(false);
-                  }}
-                >
-                  {showRepayment ? "Close Repayment" : "Post Repayment"}
-                </button>
+  style={{ ...styles.btn, opacity: 0.55, cursor: "not-allowed" }}
+  disabled
+  onClick={() => {}}
+>
+  Post Repayment
+</button>
 
                 <button
-                  style={{
-                    ...styles.btn,
-                    ...(latestManageableLoan
-                      ? styles.btnMuted
-                      : { opacity: 0.55, cursor: "not-allowed" }),
-                  }}
-                  disabled={!latestManageableLoan}
-                  onClick={() => {
-                    if (!latestManageableLoan) return;
-                    navigate(
-                      `/clients/${clientId}/loans/${latestManageableLoan.id}`
-                    );
-                  }}
-                >
-                  Manage Loan
-                </button>
+  style={{ ...styles.btn, opacity: 0.55, cursor: "not-allowed" }}
+  disabled
+  onClick={() => {}}
+>
+  Manage Loan
+</button>
 
                 <div>
                   <button
@@ -878,21 +886,27 @@ const LoanOfficerClientLoanContextPage = () => {
                                   {uploaded ? 'Uploaded' : 'Missing'}
                                 </span>
                               </td>
-                              <td style={styles.td}>
-                                {uploaded ? (
-                                  <a href={uploaded.file_url} target="_blank" rel="noreferrer" style={styles.link}>
-                                    View
-                                  </a>
-                                ) : (
-                                  <input
-                                    type="file"
-                                    style={styles.input}
-                                    onChange={(e) =>
-                                      setRequiredUploadFiles((p) => ({ ...p, [req.id]: e.target.files?.[0] || null }))
-                                    }
-                                  />
-                                )}
-                              </td>
+                             <td style={styles.td}>
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    {uploaded && (
+      <a href={uploaded.file_url} target="_blank" rel="noreferrer" style={styles.link}>
+        View Current File
+      </a>
+    )}
+
+    <input
+      type="file"
+      style={styles.input}
+      onChange={(e) =>
+        setRequiredUploadFiles((p) => ({ ...p, [req.id]: e.target.files?.[0] || null }))
+      }
+    />
+
+    {uploaded && applicationLoan?.status === "CHANGES_REQUESTED" && (
+      <span style={styles.small}>Select a new file above to replace the current document.</span>
+    )}
+  </div>
+</td>
                             </tr>
                           );
                         })}

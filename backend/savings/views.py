@@ -166,14 +166,25 @@ class SavingsAccountViewSet(viewsets.ViewSet):
             )
 
         if opening_deposit > 0:
-            SavingsTransaction.objects.create(
-                account=account,
-                tx_type="DEPOSIT",
-                amount=opening_deposit,
-                status="POSTED",
-                posted_by=request.user,
-                narration="Opening deposit",
-            )
+          tx = SavingsTransaction.objects.create(
+               account=account,
+               tx_type="DEPOSIT",
+               amount=opening_deposit,
+               status="POSTED",
+               posted_by=request.user,
+               narration="Opening deposit",
+               payment_method="CASH",
+        )
+          
+        try:
+               record_cash_savings_deposit(
+               request_user=request.user,
+               amount=tx.amount,
+               savings_tx_id=tx.id,
+        )
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
 
         try:
             create_audit_log(
