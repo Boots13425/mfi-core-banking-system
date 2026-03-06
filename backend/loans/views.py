@@ -1,3 +1,5 @@
+from pydoc import doc
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -430,15 +432,41 @@ class LoanViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         try:
-            doc = serializer.save(
+            validated = serializer.validated_data
+            doc_type = validated['document_type']
+            file_obj = validated['document_file']
+            label = validated.get('label', '')
+            description = validated.get('description', '')
+
+            existing_doc = LoanDocument.objects.filter(
                 loan=loan,
-                uploaded_by=request.user
-            )
-            
+                document_type=doc_type
+            ).first()
+
+            if existing_doc:
+                existing_doc.document_file = file_obj
+                existing_doc.label = label
+                existing_doc.description = description
+                existing_doc.uploaded_by = request.user
+                existing_doc.save()
+
+                doc = existing_doc
+                response_status = status.HTTP_200_OK
+            else:
+                doc = LoanDocument.objects.create(
+                    loan=loan,
+                    document_type=doc_type,
+                    document_file=file_obj,
+                    label=label,
+                    description=description,
+                    uploaded_by=request.user
+                )
+                response_status = status.HTTP_201_CREATED
+
             return Response(
                 LoanDocumentSerializer(doc, context={'request': request}).data,
-                status=status.HTTP_201_CREATED
-            )
+                status=response_status
+    )
         except Exception as exc:
             logger.error(f"Error uploading document for loan {loan.id}: {str(exc)}", exc_info=True)
             
@@ -531,14 +559,24 @@ class LoanViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 for doc_type_id, file_obj, file_key in files_to_upload:
-                    # Create LoanDocument with document_type_id directly (no FK query)
-                    doc = LoanDocument.objects.create(
+                    existing_doc = LoanDocument.objects.filter(
                         loan=loan,
-                        document_type_id=doc_type_id,
-                        document_file=file_obj,
-                        uploaded_by=request.user
-                    )
-                    
+                        document_type_id=doc_type_id
+                    ).first()
+
+                    if existing_doc:
+                        existing_doc.document_file = file_obj
+                        existing_doc.uploaded_by = request.user
+                        existing_doc.save()
+                        doc = existing_doc
+                    else:
+                        doc = LoanDocument.objects.create(
+                            loan=loan,
+                            document_type_id=doc_type_id,
+                            document_file=file_obj,
+                            uploaded_by=request.user
+                        )
+
                     uploaded_docs.append(
                         LoanDocumentSerializer(doc, context={'request': request}).data
                     )
