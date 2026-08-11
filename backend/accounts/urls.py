@@ -6,6 +6,10 @@ from .views import (
     refresh_token,
     get_user_profile,
     invite_set_password,
+    send_otp,
+    verify_otp,
+    get_user_dashboard,
+    get_mobile_dashboard,
     BranchViewSet,
     UserViewSet,
     AuditLogViewSet
@@ -22,5 +26,9 @@ urlpatterns = [
     path('auth/refresh/', refresh_token, name='refresh'),
     path('auth/me/', get_user_profile, name='user-profile'),
     path('auth/invite-set-password/', invite_set_password, name='invite-set-password'),
+    path('auth/send-otp/', send_otp, name='send-otp'),
+    path('auth/verify-otp/', verify_otp, name='verify-otp'),
     path('', include(router.urls)),
+    path('dashboard-data/', get_user_dashboard, name='dashboard_data'),
+    path('mobile/dashboard/', get_mobile_dashboard, name='mobile-dashboard'),
 ]

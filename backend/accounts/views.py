@@ -8,8 +8,10 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
 from django.core.mail import send_mail
+from django.core.cache import cache
 from django.conf import settings
 from django.db.models import Q
+from django.http import JsonResponse
 
 from .models import User, Branch, AuditLog
 from .serializers import (
@@ -21,6 +23,7 @@ from .permissions import IsSuperAdmin
 from .utils import (
     send_invite_email,
     send_password_reset_email,
+    send_otp_email,
     create_audit_log,
     get_client_ip,
 )
@@ -72,6 +75,89 @@ def _reset_failed_attempts_if_needed(user):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def send_otp(request):
+    """
+    Generate and email a 6-digit verification OTP code.
+    Stores the code in Django cache for 5 minutes.
+    """
+    email = request.data.get('email')
+    if not email:
+        return Response({'detail': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        otp = send_otp_email(email)
+        # Store OTP in Django cache for 5 minutes (300 seconds)
+        cache.set(f"otp_{email}", otp, timeout=300)
+
+        create_audit_log(
+            actor=None,
+            action='OTP_SENT',
+            target_type='User',
+            target_id=email,
+            summary=f"OTP verification code sent to {email}",
+            ip_address=get_client_ip(request),
+        )
+
+        return Response(
+            {'detail': 'Verification code sent successfully.'},
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        return Response(
+            {'detail': f'Failed to send email: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    """
+    Verify the provided 6-digit OTP code against the cached value.
+    """
+    email = request.data.get('email')
+    otp = request.data.get('otp')
+
+    if not email or not otp:
+        return Response(
+            {'detail': 'Email and verification code are required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    cached_otp = cache.get(f"otp_{email}")
+
+    if not cached_otp:
+        return Response(
+            {'detail': 'Verification code has expired or was not requested.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if str(cached_otp) != str(otp).strip():
+        return Response(
+            {'detail': 'Invalid verification code.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Clear OTP from cache after successful verification
+    cache.delete(f"otp_{email}")
+
+    create_audit_log(
+        actor=None,
+        action='OTP_VERIFIED',
+        target_type='User',
+        target_id=email,
+        summary=f"OTP verification successful for {email}",
+        ip_address=get_client_ip(request),
+    )
+
+    return Response(
+        {'detail': 'Email verified successfully.'},
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def login(request):
     """Login with username + password (with limited trial attempts for operators)"""
     username = request.data.get('username')
@@ -83,10 +169,8 @@ def login(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Best-effort fetch to track attempts even on invalid credentials
     user = User.objects.filter(username=username).first()
 
-    # If the account is already inactive, short-circuit with clear message
     if user and not user.is_active:
         return Response(
             {
@@ -100,7 +184,6 @@ def login(request):
 
     auth_user = authenticate(username=username, password=password)
     if not auth_user:
-        # Failed login attempt
         locked, remaining = _handle_failed_login_attempt(request, user)
         if locked:
             return Response(
@@ -114,7 +197,6 @@ def login(request):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Generic invalid credentials message with remaining attempts info when available
         if remaining is not None and remaining > 0:
             return Response(
                 {
@@ -132,7 +214,6 @@ def login(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Successful authentication – ensure account is active
     if not auth_user.is_active:
         return Response(
             {
@@ -173,7 +254,6 @@ def login_email(request):
     user = User.objects.filter(email=email).first()
 
     if not user:
-        # No user to track attempts for, just generic error
         return Response(
             {'detail': 'Invalid email or password'},
             status=status.HTTP_400_BAD_REQUEST,
@@ -233,6 +313,7 @@ def login_email(request):
         status=status.HTTP_200_OK,
     )
 
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def refresh_token(request):
@@ -248,11 +329,12 @@ def refresh_token(request):
         refresh_token_obj = RefreshToken(refresh)
         access = str(refresh_token_obj.access_token)
         return Response({'access': access}, status=status.HTTP_200_OK)
-    except Exception as e:
+    except Exception:
         return Response(
             {'detail': 'Invalid refresh token'},
             status=status.HTTP_401_UNAUTHORIZED
         )
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -260,6 +342,168 @@ def get_user_profile(request):
     """Get current user profile"""
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_dashboard(request):
+    user = request.user
+    
+    # Adjust this based on where your account/savings balance is stored
+    # Example assuming user has a related savings account profile:
+    balance = getattr(user, 'balance', 0.00) 
+    
+    return Response({
+        "userId": user.id,
+        "fullName": user.get_full_name() or user.username,
+        "email": user.email,
+        "bankNumber": getattr(user, 'account_number', 'N/A'),
+        "balance": float(balance),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_mobile_dashboard(request):
+    """
+    Mobile bridge endpoint - called by Node.js server on behalf of a logged-in
+    app user. Protected by a shared service token header instead of JWT.
+
+    Query params:
+      - email (required)
+      - account_number (optional, used to narrow down if client has multiple accounts)
+
+    Returns client info, savings account balance and recent transactions.
+    """
+    # 1. Validate service token
+    service_token = request.headers.get('X-Service-Token', '')
+    expected_token = getattr(settings, 'MOBILE_SERVICE_TOKEN', '')
+    if not expected_token or service_token != expected_token:
+        return Response(
+            {'detail': 'Unauthorized. Invalid or missing service token.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    # 2. Get lookup params
+    email = (request.query_params.get('email') or '').strip().lower()
+    account_number = (request.query_params.get('account_number') or '').strip()
+
+    if not email:
+        return Response(
+            {'detail': 'email query parameter is required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 3. Import here to avoid circular imports
+    try:
+        from clients.models import Client
+        from savings.models import SavingsAccount, SavingsTransaction, get_account_balance
+    except ImportError as e:
+        return Response(
+            {'detail': f'Server configuration error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    # 4. Find client by email
+    try:
+        client = Client.objects.select_related('branch').get(email__iexact=email)
+    except Client.DoesNotExist:
+        return Response(
+            {'detail': 'No bank client found matching this email address.',
+             'client_found': False},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Client.MultipleObjectsReturned:
+        client = Client.objects.select_related('branch').filter(
+            email__iexact=email
+        ).first()
+
+    # 5. Get savings accounts for this client
+    accounts_qs = SavingsAccount.objects.select_related(
+        'product', 'branch'
+    ).filter(client=client)
+
+    if account_number:
+        accounts_qs = accounts_qs.filter(account_number=account_number)
+
+    # Pick primary account (first ACTIVE, else first)
+    primary_account = (
+        accounts_qs.filter(status='ACTIVE').first()
+        or accounts_qs.first()
+    )
+
+    if not primary_account:
+        return Response({
+            'client_found': True,
+            'client': {
+                'full_name': client.full_name,
+                'email': client.email,
+                'phone': client.phone or '',
+                'status': client.status,
+                'branch': client.branch.name if client.branch else '',
+            },
+            'account': None,
+            'balance': 0.0,
+            'current_balance': 0.0,
+            'recent_transactions': [],
+            'message': 'Client found but has no savings account.'
+        })
+
+    # 6. Calculate balance
+    balance = get_account_balance(primary_account)
+
+    # 7. Fetch recent transactions (last 20 POSTED or PENDING)
+    recent_txs = SavingsTransaction.objects.filter(
+        account=primary_account,
+        status__in=['POSTED', 'PENDING']
+    ).order_by('-created_at')[:20]
+
+    transactions_data = [
+        {
+            'id': tx.id,
+            'transaction_type': tx.tx_type,
+            'amount': str(tx.amount),
+            'status': tx.status,
+            'narration': tx.narration or '',
+            'reference': tx.reference or '',
+            'payment_method': tx.payment_method or '',
+            'created_at': tx.created_at.isoformat(),
+        }
+        for tx in recent_txs
+    ]
+
+    # 8. Build all savings accounts summary
+    all_accounts = []
+    for acc in accounts_qs:
+        acc_balance = get_account_balance(acc)
+        all_accounts.append({
+            'account_number': acc.account_number,
+            'product_name': acc.product.name if acc.product else '',
+            'status': acc.status,
+            'balance': str(acc_balance),
+            'branch': acc.branch.name if acc.branch else '',
+            'is_primary': acc.id == primary_account.id,
+        })
+
+    return Response({
+        'client_found': True,
+        'client': {
+            'full_name': client.full_name,
+            'email': client.email,
+            'phone': client.phone or '',
+            'status': client.status,
+            'branch': client.branch.name if client.branch else '',
+        },
+        'account': {
+            'account_number': primary_account.account_number,
+            'product_name': primary_account.product.name if primary_account.product else '',
+            'status': primary_account.status,
+            'branch': primary_account.branch.name if primary_account.branch else '',
+        },
+        'available_balance': str(balance),
+        'current_balance': str(balance),
+        'all_accounts': all_accounts,
+        'recent_transactions': transactions_data,
+    })
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -289,7 +533,6 @@ def invite_set_password(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Determine whether this is an initial invite or a password reset
     had_usable_password_before = user.has_usable_password()
 
     user.set_password(new_password)
@@ -313,6 +556,7 @@ def invite_set_password(request):
     return Response({
         'detail': 'Password set successfully'
     }, status=status.HTTP_200_OK)
+
 
 class BranchViewSet(viewsets.ModelViewSet):
     """Branch management (Super Admin only)"""
@@ -366,6 +610,7 @@ class BranchViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(branch)
         return Response(serializer.data)
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """User management (Super Admin only)"""
@@ -482,7 +727,6 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         user = self.get_object()
 
-        # Reuse the same set-password link generation logic used for invitations.
         send_password_reset_email(user)
 
         create_audit_log(
@@ -547,6 +791,7 @@ class UserViewSet(viewsets.ModelViewSet):
         cashiers = User.objects.filter(branch_id=branch_id, role='CASHIER', is_active=True).order_by('first_name', 'last_name')
         serializer = UserSerializer(cashiers, many=True)
         return Response(serializer.data)
+
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Audit logs (Super Admin only)"""

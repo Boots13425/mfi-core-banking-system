@@ -1,3 +1,4 @@
+import random
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -31,6 +32,34 @@ def _build_from_email():
     if not from_addr:
         from_addr = "no-reply@localhost"
     return formataddr(("MFI TEAM", from_addr))
+
+
+def send_otp_email(email):
+    """
+    Generates a 6-digit OTP and sends it to the user's email address.
+    Returns the generated OTP so it can be cached/stored in the view.
+    """
+    otp = str(random.randint(100000, 999999))
+    
+    subject = "Your Bankin' Verification Code"
+    message = (
+        f"Hello,\n\n"
+        f"Your 6-digit verification code is: {otp}\n\n"
+        "This code will expire in 5 minutes. Do not share this code with anyone.\n\n"
+        "Regards,\nMFI TEAM"
+    )
+
+    from_email = _build_from_email()
+
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=from_email,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+
+    return otp
 
 
 def generate_set_password_link(user):

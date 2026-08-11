@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-*k=#3mm_t6p!rw4i*(2bsfhfk-&=a_yg1)^cxjr_#0#b=hl10o
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [h.strip() for h in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",") if h.strip()]
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.100.199', '*']
 # during development we permit any host so devices on the same LAN can
 # connect using the machine's IP address.  in production you should narrow
 # this down to your actual hostnames.
@@ -42,6 +42,10 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
+MOBILE_APP_URL = config("MOBILE_APP_URL", default="http://192.168.100.199:8081")
+
+# Shared service token used by the Node.js bridge to authenticate with Django
+MOBILE_SERVICE_TOKEN = config("MOBILE_SERVICE_TOKEN", default="bankin_bridge_secret_2026")
 
 # --- Email (Gmail SMTP) ---
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -91,6 +95,16 @@ CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
     FRONTEND_URL,
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    
+]))
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
+    FRONTEND_URL,
+    MOBILE_APP_URL,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://192.168.100.199:8081",
 ]))
 
 
